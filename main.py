@@ -1,11 +1,9 @@
 import tkinter as tk
-from tkinter import scrolledtext
-from tkinter import messagebox
+from tkinter import scrolledtext, messagebox
 import json
 import requests
 
 # Configuration
-SKILL = "Mining"
 API_URL = "https://api.hypixel.net/v2/skyblock/auctions"
 
 # Dictionary for color mapping based on rarity
@@ -18,6 +16,8 @@ RARITY_COLORS = {
     "MYTHIC": "#FF94E3"
 }
 
+# Default selected skill
+DEFAULT_SKILL = "Mining"
 
 class AuctionAnalyzerApp:
     def __init__(self, master):
@@ -27,6 +27,18 @@ class AuctionAnalyzerApp:
 
         self.label = tk.Label(master, text="Auction Analyzer", font=("Arial", 24), fg='white', bg='black')
         self.label.pack(pady=10)
+
+        # Dropdown for selecting skill
+        self.skill_label = tk.Label(master, text="Select Skill:", font=("Arial", 12), fg='white', bg='black')
+        self.skill_label.pack()
+
+        self.skill_options = ["Mining", "Fishing", "Combat", "Farming", "Foraging", "Enchanting", "Alchemy"]
+        self.selected_skill = tk.StringVar(master)
+        self.selected_skill.set(DEFAULT_SKILL)
+
+        self.skill_dropdown = tk.OptionMenu(master, self.selected_skill, *self.skill_options, command=self.on_skill_selected)
+        self.skill_dropdown.config(bg='white', fg='black', font=("Arial", 12))
+        self.skill_dropdown.pack(pady=5)
 
         self.button = tk.Button(master, text="Analyze Auctions", command=self.analyze_auctions, bg='white', fg='black',
                                 font=("Arial", 16))
@@ -50,14 +62,21 @@ class AuctionAnalyzerApp:
         for rarity, color in RARITY_COLORS.items():
             self.output_text.tag_configure(rarity, background=color)
 
+    def on_skill_selected(self, event=None):
+        # Reset total_auctions to force refresh
+        self.total_auctions = []
+        self.analyze_auctions()
+
     def analyze_auctions(self):
         try:
             pet_list = load_pet_list("petlist.json")
 
-            if not self.total_auctions:  # Fetch auctions only if total_auctions is empty
-                self.total_auctions = fetch_auctions(self.master, self.progress_label)
+            self.progress_label.config(text="Fetching auctions...")
+            self.master.update()  # Update GUI to show progress label change
 
-            output_list = calculate_profit(pet_list, self.total_auctions)
+            self.total_auctions = fetch_auctions(self.master, self.progress_label)
+
+            output_list = calculate_profit(pet_list, self.total_auctions, self.selected_skill.get())
             formatted_output = self.format_output(output_list)
             self.update_output_text(formatted_output)
 
@@ -148,7 +167,7 @@ def load_pet_list(file_path):
         return json.load(f)
 
 
-def calculate_profit(pet_list, total_auctions):
+def calculate_profit(pet_list, total_auctions, selected_skill):
     new_pet_list = []
 
     def find_best_pets(tier, pets):
@@ -157,8 +176,7 @@ def calculate_profit(pet_list, total_auctions):
             low_pet, high_pet = None, None
 
             for auction in total_auctions:
-                if auction.get("bin") and auction.get("tier") == tier and "Tier Boost" not in auction.get("item_lore",
-                                                                                                          ""):
+                if auction.get("bin") and auction.get("tier") == tier and "Tier Boost" not in auction.get("item_lore", ""):
                     if auction.get("item_name") == low_lvl:
                         if low_pet is None or auction["starting_bid"] < low_pet["starting_bid"]:
                             low_pet = auction
@@ -171,10 +189,13 @@ def calculate_profit(pet_list, total_auctions):
             except TypeError:
                 profit = 0
 
-            if key != SKILL:
-                profit /= 3
-                if key == "Alchemy":
-                    profit /= 4
+            if selected_skill in ["Mining", "Fishing", "Combat", "Farming", "Foraging"]:
+                if key != selected_skill:
+                    profit /= 3
+
+            elif selected_skill in ["Enchanting", "Alchemy"]:
+                if key != selected_skill:
+                    profit /= 12
 
             new_pet_list.append({
                 "name": pet,
@@ -215,7 +236,7 @@ def format_price(price):
 def main():
     root = tk.Tk()
     app = AuctionAnalyzerApp(root)
-    root.geometry("1000x700")  # Set window size to 1000x700 pixels
+    root.geometry("1000x700")
     root.mainloop()
 
 
