@@ -3,9 +3,9 @@ from tkinter import ttk, scrolledtext, messagebox
 import json
 import asyncio
 import aiohttp
-from typing import List, Dict
 import logging
 from collections import defaultdict
+from operator import itemgetter
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,20 +39,23 @@ class AuctionAnalyzerApp:
     def setup_ui(self):
         self.master.title("Auction Analyzer")
         self.master.configure(bg='black')
-        self.master.geometry("1400x700")  # Increased width of the window
+        self.master.geometry("1400x800")  # Increased height
+
+        # Configure rows and columns to be stretchable
+        self.master.grid_rowconfigure(3, weight=1)
+        self.master.grid_columnconfigure(0, weight=1)
 
         self.label = tk.Label(self.master, text="Auction Analyzer", font=("Arial", 24), fg='white', bg='black')
-        self.label.pack(pady=10)
+        self.label.grid(row=0, column=0, pady=10)
 
         self.setup_search_bar()
         self.setup_skill_dropdown()
-        self.setup_analyze_button()
         self.setup_output_text()
-        self.setup_progress_bar()  # Setup progress bar
+        self.setup_status_label()
 
     def setup_search_bar(self):
         self.search_frame = tk.Frame(self.master, bg='black')
-        self.search_frame.pack(pady=5, padx=10, anchor='e')
+        self.search_frame.grid(row=1, column=0, pady=5, padx=10, sticky='e')
 
         self.search_label = tk.Label(self.search_frame, text="Search Pet:", font=("Arial", 12), fg='white', bg='black')
         self.search_label.pack(side='left')
@@ -60,41 +63,44 @@ class AuctionAnalyzerApp:
         self.search_entry = tk.Entry(self.search_frame, font=("Arial", 12), bg='white', fg='black')
         self.search_entry.pack(side='left', padx=5)
 
-        self.search_button = tk.Button(self.search_frame, text="Search", command=self.search_pet, bg='white', fg='black', font=("Arial", 12))
+        self.search_button = tk.Button(self.search_frame, text="Search", command=self.search_pet, bg='white',
+                                       fg='black', font=("Arial", 12))
         self.search_button.pack(side='left')
 
     def setup_skill_dropdown(self):
-        self.skill_label = tk.Label(self.master, text="Select Skill:", font=("Arial", 12), fg='white', bg='black')
-        self.skill_label.pack()
+        self.skill_frame = tk.Frame(self.master, bg='black')
+        self.skill_frame.grid(row=2, column=0, pady=5)
+
+        self.skill_label = tk.Label(self.skill_frame, text="Select Skill:", font=("Arial", 12), fg='white', bg='black')
+        self.skill_label.pack(side='left')
 
         self.skill_options = ["Mining", "Fishing", "Combat", "Farming", "Foraging", "Enchanting", "Alchemy"]
         self.selected_skill = tk.StringVar(self.master)
         self.selected_skill.set(DEFAULT_SKILL)
 
-        self.skill_dropdown = tk.OptionMenu(self.master, self.selected_skill, *self.skill_options,
+        self.skill_dropdown = tk.OptionMenu(self.skill_frame, self.selected_skill, *self.skill_options,
                                             command=self.on_skill_selected)
         self.skill_dropdown.config(bg='white', fg='black', font=("Arial", 12))
-        self.skill_dropdown.pack(pady=5)
+        self.skill_dropdown.pack(side='left', padx=5)
 
-    def setup_analyze_button(self):
-        self.button = tk.Button(self.master, text="Analyze Auctions", command=self.analyze_auctions, bg='white',
+        self.button = tk.Button(self.skill_frame, text="Analyze Auctions", command=self.analyze_auctions, bg='white',
                                 fg='black', font=("Arial", 16))
-        self.button.pack(pady=10)
+        self.button.pack(side='left', padx=10)
 
     def setup_output_text(self):
         self.output_frame = tk.Frame(self.master, bg='black')
-        self.output_frame.pack(padx=10, pady=10)
+        self.output_frame.grid(row=3, column=0, padx=10, pady=10, sticky='nsew')
 
         self.output_text = scrolledtext.ScrolledText(self.output_frame, width=140, height=30, bg='black', fg='white',
-                                                     font=("Courier", 12))  # Increased width to 140
-        self.output_text.pack()
+                                                     font=("Courier", 14))
+        self.output_text.pack(expand=True, fill='both')
 
         for rarity, color in RARITY_COLORS.items():
             self.output_text.tag_configure(rarity, background=color)
 
-    def setup_progress_bar(self):
-        self.progress_bar = ttk.Progressbar(self.master, orient='horizontal', length=200, mode='determinate')
-        self.progress_bar.pack(pady=10)
+    def setup_status_label(self):
+        self.status_label = tk.Label(self.master, text="", fg='white', bg='black')
+        self.status_label.grid(row=4, column=0, pady=5)
 
     def on_skill_selected(self, event=None):
         self.total_auctions = []
@@ -109,14 +115,17 @@ class AuctionAnalyzerApp:
                         raise ValueError("Invalid API response: 'totalPages' or 'auctions' missing")
 
                     total_pages = data["totalPages"]
-                    self.progress_bar['maximum'] = total_pages
 
                     tasks = [self.fetch_page(session, i, total_pages) for i in range(total_pages)]
                     await asyncio.gather(*tasks)
 
+            self.status_label.config(text="Fetch complete. Starting analysis...")
+            self.master.update_idletasks()
+
         except Exception as e:
             logging.error(f"Error fetching auctions: {str(e)}")
             messagebox.showerror("Error", f"Failed to fetch auctions: {str(e)}")
+
 
     async def fetch_page(self, session, page, total_pages):
         try:
@@ -126,22 +135,40 @@ class AuctionAnalyzerApp:
                     self.total_auctions.extend(data["auctions"])
                 else:
                     logging.warning(f"Page {page + 1} has no 'auctions'")
-                self.progress_bar['value'] = page + 1
-                logging.info(f"Fetched page {page + 1}/{total_pages}")  # Log progress
+                self.status_label.config(text=f"Fetched page {page + 1}/{total_pages}")
+                self.master.update_idletasks()
+                logging.info(f"Fetched page {page + 1}/{total_pages}")
         except Exception as e:
             logging.error(f"Error fetching page {page + 1}: {str(e)}")
 
     def analyze_auctions(self):
         try:
+            self.status_label.config(text="Loading pet list...")
+            self.master.update_idletasks()
             self.pet_list = self.load_pet_list("petlist.json")
+
+            self.status_label.config(text="Fetching auctions...")
+            self.master.update_idletasks()
             asyncio.run(self.fetch_auctions())
+
+            self.status_label.config(text="Calculating profits...")
+            self.master.update_idletasks()
             output_list = self.calculate_profit(self.pet_list, self.total_auctions, self.selected_skill.get())
+
+            self.status_label.config(text="Formatting output...")
+            self.master.update_idletasks()
             formatted_output = self.format_output(output_list)
+
+            self.status_label.config(text="Updating display...")
+            self.master.update_idletasks()
             self.update_output_text(formatted_output)
-            logging.info("Auction analysis completed.")  # Log completion
+
+            self.status_label.config(text="Analysis complete.")
+            logging.info("Auction analysis completed.")
         except Exception as e:
             logging.error(f"An error occurred during analysis: {str(e)}")
             messagebox.showerror("Error", f"An error occurred during analysis: {str(e)}")
+            self.status_label.config(text="Error occurred during analysis.")
 
     def search_pet(self):
         search_term = self.search_entry.get().strip().lower()
@@ -164,7 +191,6 @@ class AuctionAnalyzerApp:
             return json.load(f)
 
     def calculate_profit(self, pet_list, total_auctions, selected_skill):
-        # Group auctions by 'tier' and 'item_name'
         auctions_by_category = defaultdict(list)
         for auction in total_auctions:
             if not auction.get("bin"):
@@ -178,7 +204,13 @@ class AuctionAnalyzerApp:
             for key, pets in category.items():
                 for tier in RARITY_COLORS.keys():
                     for pet in pets:
-                        low_lvl, high_lvl = f"[Lvl 1] {pet}", f"[Lvl 100] {pet}"
+                        if pet == "Golden Dragon":
+                            low_lvl, high_lvl = "[Lvl 102] Golden Dragon", "[Lvl 200] Golden Dragon"
+                            xp_required = self.get_golden_dragon_xp()
+                        else:
+                            low_lvl, high_lvl = f"[Lvl 1] {pet}", f"[Lvl 100] {pet}"
+                            xp_required = XP_REQUIRED[tier]
+
                         low_pet = self.find_min_auction(auctions_by_category.get((tier, low_lvl), []))
                         high_pet = self.find_min_auction(auctions_by_category.get((tier, high_lvl), []))
 
@@ -189,8 +221,8 @@ class AuctionAnalyzerApp:
                             net_profit = gross_profit - ah_tax - claim_tax
                             profit_without_tax = gross_profit
 
-                            # Calculate coins per XP based on the XP required for the rarity
-                            coins_per_xp = net_profit / XP_REQUIRED[tier]
+                            coins_per_xp = net_profit / xp_required
+                            coins_per_xp = round(coins_per_xp, 2)
 
                             if selected_skill in ["Mining", "Fishing", "Combat", "Farming", "Foraging"] and key != selected_skill:
                                 net_profit /= 3
@@ -211,7 +243,8 @@ class AuctionAnalyzerApp:
                                 "high_price": high_pet["starting_bid"]
                             })
 
-        return sorted(new_pet_list, key=lambda p: p["profit"], reverse=True)
+        new_pet_list.sort(key=itemgetter("coins_per_xp"), reverse=True)
+        return new_pet_list
 
     def find_min_auction(self, auctions):
         return min((a for a in auctions if "Tier Boost" not in a.get("item_lore", "")),
@@ -221,10 +254,10 @@ class AuctionAnalyzerApp:
         return "\n".join(
             f"Pet: {item['name']} Rarity: {item['tier']} "
             f"Profit: {self.format_price(item['profit'])} "
-            f"Profit (without tax): {self.format_price(item['profit_without_tax'])} "
-            f"Coins per XP: {self.format_price(item['coins_per_xp'])} "
-            f"LVL 1 Price: {self.format_price(item['low_price'])} "
-            f"LVL 100 Price: {self.format_price(item['high_price'])}"
+            f"Profit (w/o tax): {self.format_price(item['profit_without_tax'])} "
+            f"Coins per XP: {self.format_price(item['coins_per_xp'], is_coins_per_xp=True)} "
+            f"{'LVL 102' if item['name'] == 'Golden Dragon' else 'LVL 1'} Price: {self.format_price(item['low_price'])} "
+            f"LVL {200 if item['name'] == 'Golden Dragon' else 100} Price: {self.format_price(item['high_price'])}"
             for item in output_list
         )
 
@@ -247,12 +280,19 @@ class AuctionAnalyzerApp:
             self.output_text.tag_config('outline', foreground='black')
 
     @staticmethod
-    def format_price(price):
+    def format_price(price, is_coins_per_xp=False):
+        if isinstance(price, str):
+            return price
+
+        if is_coins_per_xp:
+            return f"{price:.2f}".rstrip('0').rstrip('.')
+
         if price >= 1e6:
-            return f"{price / 1e6:.1f}m"
+            return f"{price / 1e6:.1f}m".rstrip('0').rstrip('.')
         elif price >= 1e3:
-            return f"{price / 1e3:.1f}k"
-        return str(price)
+            return f"{price / 1e3:.1f}k".rstrip('0').rstrip('.')
+        else:
+            return f"{price:.1f}".rstrip('0').rstrip('.')
 
     @staticmethod
     def calculate_ah_tax(price):
@@ -262,6 +302,13 @@ class AuctionAnalyzerApp:
             return price * 0.02
         else:
             return price * 0.025
+
+    @staticmethod
+    def get_golden_dragon_xp():
+        with open("GoldenDragon.json", "r") as f:
+            data = json.load(f)
+        levels = data["levels"]
+        return levels[-1]["totalXP"] - levels[0]["totalXP"]
 
 
 def main():
