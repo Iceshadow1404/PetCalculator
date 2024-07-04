@@ -48,10 +48,50 @@ class AuctionAnalyzerApp:
         self.label = tk.Label(self.master, text="Auction Analyzer", font=("Arial", 24), fg='white', bg='black')
         self.label.grid(row=0, column=0, pady=10)
 
+        self.setup_top_buttons()
         self.setup_search_bar()
         self.setup_skill_dropdown()
         self.setup_output_text()
         self.setup_status_label()
+
+    def setup_top_buttons(self):
+        self.top_buttons_frame = tk.Frame(self.master, bg='black')
+        self.top_buttons_frame.grid(row=1, column=0, pady=5, padx=10, sticky='w')
+
+        # Rarity Button
+        self.rarity_vars = {rarity: tk.BooleanVar(value=True) for rarity in RARITY_COLORS.keys()}
+        self.rarity_button = tk.Menubutton(self.top_buttons_frame, text="Rarity", bg='white', fg='black',
+                                           font=("Arial", 12))
+        self.rarity_button.pack(side='left', padx=5)
+        self.rarity_menu = tk.Menu(self.rarity_button, tearoff=0)
+        self.rarity_button['menu'] = self.rarity_menu
+        for rarity in RARITY_COLORS.keys():
+            self.rarity_menu.add_checkbutton(label=rarity, variable=self.rarity_vars[rarity],
+                                             command=self.filter_results)
+
+        # Skill Button
+        self.skill_var = tk.StringVar(value="All")
+        self.skill_button = tk.Menubutton(self.top_buttons_frame, text="Skill", bg='white', fg='black',
+                                          font=("Arial", 12))
+        self.skill_button.pack(side='left', padx=5)
+        self.skill_menu = tk.Menu(self.skill_button, tearoff=0)
+        self.skill_button['menu'] = self.skill_menu
+        skills = ["All", "Mining", "Fishing", "Combat", "Farming", "Foraging", "Enchanting", "Alchemy"]
+        for skill in skills:
+            self.skill_menu.add_radiobutton(label=skill, variable=self.skill_var, value=skill,
+                                            command=self.filter_results)
+
+        # Sort Order Button
+        self.sort_var = tk.StringVar(value="Profit per XP")
+        self.sort_button = tk.Menubutton(self.top_buttons_frame, text="Sort By", bg='white', fg='black',
+                                         font=("Arial", 12))
+        self.sort_button.pack(side='left', padx=5)
+        self.sort_menu = tk.Menu(self.sort_button, tearoff=0)
+        self.sort_button['menu'] = self.sort_menu
+        sort_options = ["Profit per XP", "Profit"]
+        for option in sort_options:
+            self.sort_menu.add_radiobutton(label=option, variable=self.sort_var, value=option,
+                                           command=self.filter_results)
 
     def setup_search_bar(self):
         self.search_frame = tk.Frame(self.master, bg='black')
@@ -126,6 +166,26 @@ class AuctionAnalyzerApp:
             logging.error(f"Error fetching auctions: {str(e)}")
             messagebox.showerror("Error", f"Failed to fetch auctions: {str(e)}")
 
+    def apply_filters(self, output_list):
+        filtered_list = output_list
+
+        # Apply rarity filter
+        selected_rarities = [rarity for rarity, var in self.rarity_vars.items() if var.get()]
+        if selected_rarities:
+            filtered_list = [item for item in filtered_list if item['tier'] in selected_rarities]
+
+        # Apply skill filter
+        if self.skill_var.get() != "All":
+            filtered_list = [item for item in filtered_list if self.get_pet_skill(item['name']) == self.skill_var.get()]
+
+        return filtered_list
+
+    def get_pet_skill(self, pet_name):
+        for category in self.pet_list:
+            for skill, pets in category.items():
+                if pet_name in pets:
+                    return skill
+        return "Unknown"
 
     async def fetch_page(self, session, page, total_pages):
         try:
@@ -141,6 +201,12 @@ class AuctionAnalyzerApp:
         except Exception as e:
             logging.error(f"Error fetching page {page + 1}: {str(e)}")
 
+    def filter_results(self):
+        if self.total_auctions:
+            self.analyze_auctions()
+        else:
+            messagebox.showinfo("Info", "Please analyze auctions first before applying filters.")
+
     def analyze_auctions(self):
         try:
             self.status_label.config(text="Loading pet list...")
@@ -155,9 +221,16 @@ class AuctionAnalyzerApp:
             self.master.update_idletasks()
             output_list = self.calculate_profit(self.pet_list, self.total_auctions, self.selected_skill.get())
 
+            filtered_output = self.apply_filters(output_list)
+
             self.status_label.config(text="Formatting output...")
             self.master.update_idletasks()
-            formatted_output = self.format_output(output_list)
+            if self.sort_var.get() == "Profit":
+                filtered_output.sort(key=itemgetter("profit"), reverse=True)
+            else:  # "Profit per XP"
+                filtered_output.sort(key=itemgetter("coins_per_xp"), reverse=True)
+
+            formatted_output = self.format_output(filtered_output)
 
             self.status_label.config(text="Updating display...")
             self.master.update_idletasks()
