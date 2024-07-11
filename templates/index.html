@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Level Guide</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8 relative">
+        <!-- New login button div -->
+        <div class="absolute top-0 right-0 mt-4 mr-4">
+            <a href="{{ url_for('logout') }}" class="bg-red-600 text-white font-bold py-2 px-4 rounded">
+                Logout
+            </a>
+        </div>
+
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-4">Pet Level Guide</h1>
+            <button id="analyzeButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-lg action-button">
+                Analyze Auctions
+            </button>
+        </div>
+    
+        <div class="flex justify-between mb-8">
+            <!-- Left side: Filters -->
+            <div class="w-1/6 filter-container">
+                <div class="filter-item">
+                    <label for="skillSelect" class="filter-label">Select Skill:</label>
+                    <select id="skillSelect" class="filter-select">
+                        <option value="Mining">Mining</option>
+                        <option value="Fishing">Fishing</option>
+                        <option value="Combat">Combat</option>
+                        <option value="Farming">Farming</option>
+                        <option value="Foraging">Foraging</option>
+                        <option value="Enchanting">Enchanting</option>
+                        <option value="Alchemy">Alchemy</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="sortToggle" class="filter-label">Sort by:</label>
+                    <select id="sortToggle" class="filter-select form-control-sm">
+                        <option value="coinsPerXp">Coins per XP</option>
+                        <option value="profit">Profit</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="petSkillFilter" class="filter-label">Filter Pet Skill:</label>
+                    <select id="petSkillFilter" class="filter-select form-control-sm">
+                        <option value="All">All Skills</option>
+                        <option value="Mining">Mining</option>
+                        <option value="Fishing">Fishing</option>
+                        <option value="Combat">Combat</option>
+                        <option value="Farming">Farming</option>
+                        <option value="Foraging">Foraging</option>
+                        <option value="Enchanting">Enchanting</option>
+                        <option value="Alchemy">Alchemy</option>
+                    </select>
+                </div>
+            </div>
+        
+            <!-- Right side: Search and Rarity Filter -->
+            <div class="w-1/3 right-container">
+                <div class="search-container mb-4">
+                    <input type="text" id="searchInput" placeholder="Search Pet" class="bg-gray-800 text-gray-200 border border-gray-700 rounded px-4 py-2 text-lg">
+                    <button id="searchButton" class="bg-green-600 hover:bg-green-700 text-white font-bold rounded text-lg action-button">
+                        Search
+                    </button>
+                </div>
+        
+                <div class="rarity-filter-container">
+                    <div class="filter-item">
+                        <div id="rarityFilter" class="flex flex-wrap justify-end">
+                            <button class="filter-button button-common active" data-value="COMMON">Common</button>
+                            <button class="filter-button button-uncommon active" data-value="UNCOMMON">Uncommon</button>
+                            <button class="filter-button button-rare active" data-value="RARE">Rare</button>
+                            <button class="filter-button button-epic active" data-value="EPIC">Epic</button>
+                            <button class="filter-button button-legendary active" data-value="LEGENDARY">Legendary</button>
+                            <button class="filter-button button-mythic active" data-value="MYTHIC">Mythic</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="hidden text-center">
+            <div class="spinner inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-4 text-lg">Fetching and analyzing auctions...</p>
+        </div>
+    
+        <div id="results" class="space-y-4"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 [
   {"Mining": ["Armadillo", "Bat", "Endermite", "Glacite Golem","Goblin", "Mithril Golem", "Mole", "Rock", "Scatha", "Silverfish", "Wither Skeleton", "Snail"]},
   {"Alchemy":  ["Jellyfish", "Parrot", "Sheep"]},
-  {"Combat":  ["Golden Dragon","Ankylosaurus", "Bal", "Black Cat", "Blaze", "Ender Dragon", "Enderman", "Ghoul", "Golem", "Griffin", "Horse", "Hound", "Jerry", "Magma Cube", "Mammoth", "Phoenix", "Pigman", "Rat", "Skeleton Horse", "Skeleton", "Snowman", "Spider", "Spirit", "Tarantula", "Tiger", "T-Rex", "Turtle", "Wolf", "Zombie"]},
+  {"Combat":  ["Golden Dragon", "Ankylosaurus", "Bal", "Black Cat", "Blaze", "Ender Dragon", "Enderman", "Ghoul", "Golem", "Griffin", "Horse", "Hound", "Jerry", "Magma Cube", "Mammoth", "Phoenix", "Pigman", "Rat", "Skeleton Horse", "Skeleton", "Snowman", "Spider", "Spirit", "Tarantula", "Tiger", "T-Rex", "Turtle", "Wolf", "Zombie"]},
   {"Farming":  ["Bee", "Chicken", "Elephant", "Mooshroom Cow", "Pig", "Rabbit", "Slug"]},
   {"Foraging":  ["Giraffe", "Lion", "Monkey", "Ocelot"]},
   {"Fishing":  ["Ammonite", "Baby Yeti", "Blue Whale", "Dolphin", "Flying Fish", "Megalodon", "Penguin", "Reindeer", "Spinosaurus", "Squid"]},
