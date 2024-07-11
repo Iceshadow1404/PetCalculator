@@ -14,8 +14,8 @@ app = Flask(__name__, static_folder='static')
 CORS(app)
 
 
-app.config['SECRET_KEY'] = 'ihr_geheimer_schlüssel'  
-PASSWORD = '1404'  # Ändern Sie dies zu Ihrem gewünschten Passwort
+app.config['SECRET_KEY'] = 'secret_key'  
+PASSWORD = '1404' 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
