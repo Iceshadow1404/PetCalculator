@@ -2,7 +2,9 @@
 let storedResults = [];
 
 // Function to copy UUID to clipboard
-function copyTextToClipboard(text, buttonElement) {
+function copyTextToClipboard(text, buttonElement, event) {
+    event.stopPropagation(); // Prevent the click event from bubbling up
+    
     const textarea = document.createElement('textarea');
     textarea.value = text;
     document.body.appendChild(textarea);
@@ -140,10 +142,13 @@ $(document).ready(function() {
     // Expand/collapse pet items in compact mode
     $('#results').on('click', '.pet-item', function(e) {
         if ($('#results').hasClass('compact-mode')) {
+            // Check if the click was on a copy button
+        if (!$(e.target).closest('.copy-button').length) {
             $(this).toggleClass('expanded');
-            e.preventDefault(); // Prevent default action if in compact mode
         }
-    });
+        // We don't prevent default here, as we want the copy functionality to work
+    }
+});
 
     function displayResults(data) {
         console.log('Displaying results:', data);
@@ -169,7 +174,7 @@ $(document).ready(function() {
                                     <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
                                 </div>
                                 <div class="copy-button-container">
-                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this)">
+                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this, event)">
                                         Copy UUID
                                     </button>
                                 </div>
@@ -179,7 +184,7 @@ $(document).ready(function() {
                                     <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
                                 </div>
                                 <div class="copy-button-container">
-                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this)">
+                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this, event)">
                                         Copy UUID
                                     </button>
                                 </div>
