@@ -219,3 +219,21 @@ body {
         padding: 4px 8px;
     }
 }
+
+/* CompactMode */
+
+#compactModeButton.active {
+    background-color: #4caf50;
+  }
+  
+  .compact-mode .pet-details {
+    display: none;
+  }
+  
+  .compact-mode .pet-item {
+    cursor: pointer;
+  }
+  
+  .compact-mode .pet-item.expanded .pet-details {
+    display: block;
+  }

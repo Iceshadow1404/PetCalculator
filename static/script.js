@@ -68,6 +68,19 @@ $(document).ready(function() {
             $('#results').html('<p>Error loading results. Please try again.</p>').show();
         });
     }
+    // Compact Mode button functionality
+    $('#compactModeButton').click(function() {
+        $(this).toggleClass('active');
+        $('#results').toggleClass('compact-mode');
+    });
+
+    // Expand/collapse pet items in compact mode
+    $('#results').on('click', '.pet-item', function() {
+        if ($('#results').hasClass('compact-mode')) {
+        $(this).toggleClass('expanded');
+        }
+    });
+
 
     // Event listeners for buttons and dropdowns
     $('#analyzeButton').click(analyzeAuctions);
@@ -138,47 +151,49 @@ $(document).ready(function() {
         console.log('Displaying results:', data);
         var resultsHtml = '';
         data.forEach(function(item) {
-            resultsHtml += `
-                <div class="bg-gray-800 rounded-lg shadow-lg p-6" data-item='${JSON.stringify(item)}'>
-                    <div class="flex items-center justify-center mb-4">
-                        <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
-                        <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
+          resultsHtml += `
+            <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item" data-item='${JSON.stringify(item)}'>
+              <div class="flex items-center justify-center mb-4">
+                <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
+                <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
+              </div>
+              <div class="pet-details">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="text-center">
+                    <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
+                    <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
+                    <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
+                  </div>
+                  <div class="text-center button-container">
+                    <div class="price-container">
+                      <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
+                      <span class="price-value">${formatPrice(item.low_price)}</span>
+                      <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="text-center">
-                            <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
-                            <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
-                            <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
-                        </div>
-                        <div class="text-center button-container">
-                            <div class="price-container">
-                                <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
-                                <span class="price-value">${formatPrice(item.low_price)}</span>
-                                <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
-                            </div>
-                            <div class="copy-button-container">
-                                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this)">
-                                    Copy UUID
-                                </button>
-                            </div>
-                            <div class="price-container mt-4">
-                                <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
-                                <span class="price-value">${formatPrice(item.high_price)}</span>
-                                <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
-                            </div>
-                            <div class="copy-button-container">
-                                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this)">
-                                    Copy UUID
-                                </button>
-                            </div>
-                        </div>
+                    <div class="copy-button-container">
+                      <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this)">
+                        Copy UUID
+                      </button>
                     </div>
+                    <div class="price-container mt-4">
+                      <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
+                      <span class="price-value">${formatPrice(item.high_price)}</span>
+                      <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
+                    </div>
+                    <div class="copy-button-container">
+                      <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this)">
+                        Copy UUID
+                      </button>
+                    </div>
+                  </div>
                 </div>
-            `;
+              </div>
+            </div>
+          `;
         });
         $('#results').html(resultsHtml);
         console.log('Results HTML updated');
-    }
+      }
 
     // Function to format prices
     function formatPrice(price, isCoinsPerXp = false) {
