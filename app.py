@@ -8,14 +8,32 @@ from operator import itemgetter
 import logging
 from flask_cors import CORS
 import os
+import sqlite3
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
+from collections import defaultdict
 
+# Initialize the database
+def init_db():
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS pet_prices
+                 (pet_name TEXT, tier TEXT, level TEXT, price INTEGER, timestamp DATETIME)''')
+    conn.commit()
+    conn.close()
+
+# Call this function when your app starts
+init_db()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
 
 app.config['SECRET_KEY'] = 'ihr_geheimer_schlüssel'  
-PASSWORD = '1404'  # Ändern Sie dies zu Ihrem gewünschten Passwort
+PASSWORD = '1404' 
+
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -177,6 +195,9 @@ def calculate_profit(pet_list, total_auctions, selected_skill):
                         net_profit = gross_profit - ah_tax - claim_tax
                         profit_without_tax = gross_profit
 
+                        low_day_avg, low_week_avg = get_average_prices(pet, tier, "low")
+                        high_day_avg, high_week_avg = get_average_prices(pet, tier, "high")
+
                         coins_per_xp = net_profit / xp_required
                         coins_per_xp = round(coins_per_xp, 2)
 
@@ -199,15 +220,16 @@ def calculate_profit(pet_list, total_auctions, selected_skill):
                             "high_price": high_pet["starting_bid"],
                             "low_uuid": low_pet.get("uuid", "N/A"),
                             "high_uuid": high_pet.get("uuid", "N/A"),
-                            "skill": key
+                            "skill": key,
+                            "low_day_avg": low_day_avg,
+                            "low_week_avg": low_week_avg,
+                            "high_day_avg": high_day_avg,
+                            "high_week_avg": high_week_avg
                         })
 
     new_pet_list.sort(key=itemgetter("coins_per_xp"), reverse=True)
     return new_pet_list
 
-def find_min_auction(auctions):
-    return min((a for a in auctions if "Tier Boost" not in a.get("item_lore", "")),
-               key=lambda x: x["starting_bid"], default=None)
 
 def calculate_ah_tax(price):
     if price < 10000000:
@@ -222,6 +244,83 @@ def get_golden_dragon_xp():
         data = json.load(f)
     levels = data["levels"]
     return levels[-1]["totalXP"] - levels[0]["totalXP"]
+
+def get_average_prices(pet_name, tier, level):
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+    
+    now = datetime.now()
+    day_ago = now - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+    
+    c.execute("""SELECT AVG(price) FROM pet_prices 
+                 WHERE pet_name = ? AND tier = ? AND level = ? AND timestamp > ?""",
+              (pet_name, tier, level, day_ago))
+    day_avg = c.fetchone()[0]
+    
+    c.execute("""SELECT AVG(price) FROM pet_prices 
+                 WHERE pet_name = ? AND tier = ? AND level = ? AND timestamp > ?""",
+              (pet_name, tier, level, week_ago))
+    week_avg = c.fetchone()[0]
+    
+    conn.close()
+    
+    return day_avg, week_avg
+
+
+def update_pet_prices():
+    print("Starting update_pet_prices")
+    pet_list = load_pet_list("petlist.json")
+    print("Pet list loaded")
+    total_auctions = asyncio.run(fetch_auctions())
+    print(f"Fetched {len(total_auctions)} auctions")
+    
+    # Create auctions_by_category dictionary
+    auctions_by_category = defaultdict(list)
+    for auction in total_auctions:
+        if not auction.get("bin"):
+            continue
+        tier = auction.get("tier")
+        item_name = auction.get("item_name")
+        auctions_by_category[(tier, item_name)].append(auction)
+    
+    print(f"Categorized {len(auctions_by_category)} auction types")
+    
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+    
+    for category in pet_list:
+        for key, pets in category.items():
+            for tier in RARITY_COLORS.keys():
+                for pet in pets:
+                    if pet == "Golden Dragon":
+                        low_lvl, high_lvl = "[Lvl 102] Golden Dragon", "[Lvl 200] Golden Dragon"
+                    else:
+                        low_lvl, high_lvl = f"[Lvl 1] {pet}", f"[Lvl 100] {pet}"
+
+                    low_pet = find_min_auction(auctions_by_category.get((tier, low_lvl), []))
+                    high_pet = find_min_auction(auctions_by_category.get((tier, high_lvl), []))
+
+                    if low_pet:
+                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?)",
+                                  (pet, tier, "low", low_pet["starting_bid"], datetime.now()))
+                    if high_pet:
+                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?)",
+                                  (pet, tier, "high", high_pet["starting_bid"], datetime.now()))
+    
+    conn.commit()
+    conn.close()
+    print("Pet prices updated successfully")
+
+def find_min_auction(auctions):
+    return min((a for a in auctions if "Tier Boost" not in a.get("item_lore", "")),
+               key=lambda x: x["starting_bid"], default=None)
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=update_pet_prices, trigger="interval", minutes=15)
+scheduler.start()
+
+atexit.register(lambda: scheduler.shutdown()) 
 
 if __name__ == '__main__':
     if not os.path.exists('images/pets'):

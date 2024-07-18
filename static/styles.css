@@ -1,3 +1,4 @@
+/* Base styles */
 body {
     display: flex;
     flex-direction: column;
@@ -11,11 +12,13 @@ body {
     max-width: 1000px;
 }
 
+/* Typography */
 .title-container {
     text-align: center;
     margin-bottom: 1.5rem;
 }
 
+/* Card styles */
 .card {
     background-color: #2d3748;
     border-radius: 0.5rem;
@@ -29,128 +32,9 @@ body {
     align-items: center;
 }
 
+/* Button styles */
 .copy-button {
     width: 120px;
-    display: block;
-    margin: 0.5rem auto;
-}
-
-.text-common { color: #aaaaaa; }
-.text-uncommon { color: #55ff55; }
-.text-rare { color: #5555ff; }
-.text-epic { color: #aa00aa; }
-.text-legendary { color: #ffaa00; }
-.text-mythic { color: #ff55ff; }
-
-.button-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.price-container {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    margin-bottom: 0.5rem;
-}
-
-.price-label {
-    flex: 1;
-    text-align: right;
-    padding-right: 1rem;
-}
-
-.price-value {
-    flex: 1;
-    text-align: left;
-}
-
-.filter-container, .rarity-filter-container {
-    width: 20%;
-    display: flex;
-    flex-direction: column;
-    font: 20px;
-}
-
-.filter-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.filter-label {
-    flex: 0 0 120px; /* Behält die feste Breite für Labels */
-    text-align: right;
-    padding-right: 15px;
-    white-space: nowrap;
-}
-
-.filter-select {
-    flex: 0 1 200px; /* Ändert von flex: 1 zu einer festen Breite mit Flexibilität zum Schrumpfen */
-    background-color: #2d3748;
-    color: #cbd5e0;
-    border: 1px solid #4a5568;
-    border-radius: 0.25rem;
-    padding: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.right-container {
-    width: 55%;
-    display: flex;
-    flex-direction: column;
-}
-
-.search-container {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    width: 100%;
-}
-
-#searchInput {
-    flex-grow: 1;
-    margin-right: 10px;
-}
-
-#searchButton {
-    width: auto;
-}
-
-.rarity-filter-container {
-    width: 100%;
-}
-
-#rarityFilter {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 5px;
-}
-
-.filter-button {
-    flex-grow: 1;
-    text-align: center;
-    padding: 5px 10px;
-    font-size: 0.8rem;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    color: black;
-    white-space: nowrap;
-}
-
-/* Ensure the last button (Mythic) aligns with the search button */
-.filter-button:last-child {
-    margin-right: 0;
-}
-
-@media (max-width: 1200px) {
-    .filter-button {
-        font-size: 0.7rem;
-        padding: 4px 8px;
-    }
 }
 
 .action-button {
@@ -167,71 +51,98 @@ body {
     align-self: center;
 }
 
-#rarityFilter {
+/* Rarity text colors */
+.text-common { color: #aaaaaa; }
+.text-uncommon { color: #55ff55; }
+.text-rare { color: #5555ff; }
+.text-epic { color: #aa00aa; }
+.text-legendary { color: #ffaa00; }
+.text-mythic { color: #ff55ff; }
+
+/* Layout containers */
+.button-container {
     display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
 }
 
-.active {
-    background-color: #4caf50;
+.price-container {
+    width: 100%;
+    text-align: center;
 }
 
-.inactive {
-    background-color: #f1f1f1;
-    color: #333;
+.copy-button-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 0.5rem;
 }
 
-.button-common { background-color: #cccccc; }
-.button-uncommon { background-color: #a3d5a3; }
-.button-rare { background-color: #73a9c2; }
-.button-epic { background-color: #9561e2; }
-.button-legendary { background-color: #e2a61e; }
-.button-mythic { background-color: #e26f7c; }
-
-.inactive::after {
-    content: "✘";
-    color: red;
-    font-size: 40px;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-}
-
-.rarity-filter-container .filter-item {
-    align-items: flex-start;
-}
-
-.rarity-filter-container .filter-label {
-    margin-top: 5px;
+.filter-container, .rarity-filter-container {
+    width: 20%;
+    display: flex;
+    flex-direction: column;
+    font: 20px;
 }
 
 .right-container {
+    width: 55%;
     display: flex;
     flex-direction: column;
 }
 
-.search-container {
-    margin-bottom: 1rem;
+/* Filter styles */
+.filter-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
 }
 
-
-.rarity-filter-container .filter-label {
-    margin-right: 10px;
+.filter-label {
+    flex: 0 0 120px;
+    text-align: right;
+    padding-right: 15px;
     white-space: nowrap;
 }
 
+.filter-select {
+    flex: 0 1 200px;
+    background-color: #2d3748;
+    color: #cbd5e0;
+    border: 1px solid #4a5568;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Search container */
+.search-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
+#searchInput {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+#searchButton {
+    width: auto;
+}
+
+/* Rarity filter */
 #rarityFilter {
     display: flex;
     flex-wrap: nowrap;
     gap: 5px;
+    justify-content: flex-end;
 }
 
 .filter-button {
-    position: relative; /* Hinzugefügt */
+    position: relative;
     padding: 5px 10px;
     font-size: 1rem;
     border: none;
@@ -239,19 +150,38 @@ body {
     cursor: pointer;
     color: black;
     white-space: nowrap;
-    overflow: hidden; /* Hinzugefügt */
+    overflow: hidden;
+    flex-grow: 1;
+    text-align: center;
 }
 
-.inactive::after {
+/* Rarity button colors */
+.filter-button.button-common { background-color: #cccccc; }
+.filter-button.button-uncommon { background-color: #a3d5a3; }
+.filter-button.button-rare { background-color: #73a9c2; }
+.filter-button.button-epic { background-color: #9561e2; }
+.filter-button.button-legendary { background-color: #e2a61e; }
+.filter-button.button-mythic { background-color: #e26f7c; }
+
+/* Active/Inactive states */
+.filter-button.active {
+    opacity: 1;
+}
+
+.filter-button.inactive {
+    opacity: 0.5;
+}
+
+.filter-button.inactive::after {
     content: "✘";
     color: red;
-    font-size: 1.5em; /* Geändert von 40px zu einem relativen Wert */
+    font-size: 1.5em;
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 1; /* Hinzugefügt */
+    z-index: 1;
 }
 
 .inactive::before {
@@ -261,11 +191,28 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 0
+    z-index: 0;
 }
 
+/* Price styles */
+.price-label {
+    flex: 1;
+    text-align: right;
+    padding-right: 1rem;
+}
 
-/* Wenn die Buttons zu breit sind, können Sie die Schriftgröße weiter reduzieren */
+.price-value {
+    flex: 1;
+    text-align: left;
+}
+
+.price-avg {
+    font-size: 1em;
+    color: #888;
+    margin-left: 5px;
+}
+
+/* Responsive adjustments */
 @media (max-width: 1200px) {
     .filter-button {
         font-size: 0.7rem;
