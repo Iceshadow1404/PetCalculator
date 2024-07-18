@@ -19,33 +19,7 @@ function copyTextToClipboard(text, buttonElement) {
     }, 2000);
 }
 
-// Function to set a cookie
-function setCookie(name, value, days) {
-    var expires = "";
-    if (days) {
-        var date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
-}
-
-// Function to get a cookie
-function getCookie(name) {
-    var nameEQ = name + "=";
-    var ca = document.cookie.split(';');
-    for(var i=0;i < ca.length;i++) {
-        var c = ca[i];
-        while (c.charAt(0)==' ') c = c.substring(1,c.length);
-        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
-    }
-    return null;
-}
-
 $(document).ready(function() {
-    // Restore saved settings
-    restoreSavedSettings();
-
     // Perform initial analysis when page loads
     analyzeAuctions();
 
@@ -68,27 +42,10 @@ $(document).ready(function() {
             $('#results').html('<p>Error loading results. Please try again.</p>').show();
         });
     }
-    // Compact Mode button functionality
-    $('#compactModeButton').click(function() {
-        $(this).toggleClass('active');
-        $('#results').toggleClass('compact-mode');
-    });
-
-    // Expand/collapse pet items in compact mode
-    $('#results').on('click', '.pet-item', function() {
-        if ($('#results').hasClass('compact-mode')) {
-        $(this).toggleClass('expanded');
-        }
-    });
-
 
     // Event listeners for buttons and dropdowns
     $('#analyzeButton').click(analyzeAuctions);
-    
-    $('#skillSelect').change(function() {
-        setCookie('selectedSkill', $(this).val(), 30);
-        analyzeAuctions();
-    });
+    $('#skillSelect').change(analyzeAuctions);
 
     $('#searchButton').click(function() {
         const searchTerm = $('#searchInput').val();
@@ -105,22 +62,10 @@ $(document).ready(function() {
 
     $('.filter-button').on('click', function() {
         $(this).toggleClass('active inactive');
-        var activeRarities = $('.filter-button.active').map(function() {
-            return $(this).data('value');
-        }).get();
-        setCookie('activeRarities', JSON.stringify(activeRarities), 30);
         sortAndDisplayResults();
     });
 
-    $('#sortToggle').change(function() {
-        setCookie('sortBy', $(this).val(), 30);
-        sortAndDisplayResults();
-    });
-
-    $('#petSkillFilter').change(function() {
-        setCookie('petSkillFilter', $(this).val(), 30);
-        sortAndDisplayResults();
-    });
+    $('#sortToggle, #petSkillFilter').change(sortAndDisplayResults);
 
     // Function to sort and display results
     function sortAndDisplayResults() {
@@ -147,53 +92,106 @@ $(document).ready(function() {
         return data.sort((a, b) => b[sortBy] - a[sortBy]);
     }
 
+    // Function to set a cookie
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+
+    // Function to get a cookie
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
+    // Function to apply compact mode
+    function applyCompactMode(isCompact) {
+        if (isCompact) {
+            $('#compactModeButton').addClass('active');
+            $('#results').addClass('compact-mode');
+        } else {
+            $('#compactModeButton').removeClass('active');
+            $('#results').removeClass('compact-mode');
+        }
+    }
+
+    // Check cookie and apply compact mode on page load
+    var isCompact = getCookie('compactMode') === 'true';
+    applyCompactMode(isCompact);
+
+    // Compact Mode button functionality
+    $('#compactModeButton').click(function() {
+        var isCompact = !$(this).hasClass('active');
+        applyCompactMode(isCompact);
+        setCookie('compactMode', isCompact, 30); // Save for 30 days
+    });
+
+    // Expand/collapse pet items in compact mode
+    $('#results').on('click', '.pet-item', function(e) {
+        if ($('#results').hasClass('compact-mode')) {
+            $(this).toggleClass('expanded');
+            e.preventDefault(); // Prevent default action if in compact mode
+        }
+    });
+
     function displayResults(data) {
         console.log('Displaying results:', data);
         var resultsHtml = '';
         data.forEach(function(item) {
-          resultsHtml += `
-            <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item" data-item='${JSON.stringify(item)}'>
-              <div class="flex items-center justify-center mb-4">
-                <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
-                <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
-              </div>
-              <div class="pet-details">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div class="text-center">
-                    <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
-                    <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
-                    <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
-                  </div>
-                  <div class="text-center button-container">
-                    <div class="price-container">
-                      <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
-                      <span class="price-value">${formatPrice(item.low_price)}</span>
-                      <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
+            resultsHtml += `
+                <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item" data-item='${JSON.stringify(item)}'>
+                    <div class="flex items-center justify-center mb-4">
+                        <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
+                        <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
                     </div>
-                    <div class="copy-button-container">
-                      <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this)">
-                        Copy UUID
-                      </button>
+                    <div class="pet-details">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="text-center">
+                                <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
+                                <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
+                                <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
+                            </div>
+                            <div class="text-center button-container">
+                                <div class="price-container">
+                                    <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
+                                    <span class="price-value">${formatPrice(item.low_price)}</span>
+                                    <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
+                                </div>
+                                <div class="copy-button-container">
+                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this)">
+                                        Copy UUID
+                                    </button>
+                                </div>
+                                <div class="price-container mt-4">
+                                    <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
+                                    <span class="price-value">${formatPrice(item.high_price)}</span>
+                                    <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
+                                </div>
+                                <div class="copy-button-container">
+                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this)">
+                                        Copy UUID
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="price-container mt-4">
-                      <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
-                      <span class="price-value">${formatPrice(item.high_price)}</span>
-                      <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
-                    </div>
-                    <div class="copy-button-container">
-                      <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this)">
-                        Copy UUID
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </div>
-          `;
+            `;
         });
         $('#results').html(resultsHtml);
         console.log('Results HTML updated');
-      }
+    }
 
     // Function to format prices
     function formatPrice(price, isCoinsPerXp = false) {
@@ -209,36 +207,6 @@ $(document).ready(function() {
             return (price / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
         } else {
             return price.toFixed(0);
-        }
-    }
-
-    // Function to restore saved settings
-    function restoreSavedSettings() {
-        var savedSkill = getCookie('selectedSkill');
-        if (savedSkill) {
-            $('#skillSelect').val(savedSkill);
-        }
-
-        var savedSort = getCookie('sortBy');
-        if (savedSort) {
-            $('#sortToggle').val(savedSort);
-        }
-
-        var savedPetSkill = getCookie('petSkillFilter');
-        if (savedPetSkill) {
-            $('#petSkillFilter').val(savedPetSkill);
-        }
-
-        var savedRarities = getCookie('activeRarities');
-        if (savedRarities) {
-            savedRarities = JSON.parse(savedRarities);
-            $('.filter-button').each(function() {
-                if (savedRarities.includes($(this).data('value'))) {
-                    $(this).addClass('active').removeClass('inactive');
-                } else {
-                    $(this).addClass('inactive').removeClass('active');
-                }
-            });
         }
     }
 });

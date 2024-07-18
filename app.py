@@ -29,11 +29,8 @@ init_db()
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-
 app.config['SECRET_KEY'] = 'ihr_geheimer_schlüssel'  
 PASSWORD = '1404' 
-
-
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -76,7 +73,6 @@ def login():
 @login_required
 def index():
     return render_template('index.html')
-
 
 @app.route('/logout')
 def logout():
@@ -230,7 +226,6 @@ def calculate_profit(pet_list, total_auctions, selected_skill):
     new_pet_list.sort(key=itemgetter("coins_per_xp"), reverse=True)
     return new_pet_list
 
-
 def calculate_ah_tax(price):
     if price < 10000000:
         return price * 0.01
@@ -266,7 +261,6 @@ def get_average_prices(pet_name, tier, level):
     conn.close()
     
     return day_avg, week_avg
-
 
 def update_pet_prices():
     print("Starting update_pet_prices")
