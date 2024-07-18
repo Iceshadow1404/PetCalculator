@@ -1,3 +1,5 @@
+console.log("Script starting");
+
 // Store the results from the server
 let storedResults = [];
 
@@ -22,7 +24,77 @@ function copyTextToClipboard(text, buttonElement, event) {
 }
 
 $(document).ready(function() {
+    console.log("Document ready");
+    initializeFilters();
+    applySettingsFromCookies();
+    analyzeAuctions();
+
+    // Function to set a cookie
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+
+    // Function to get a cookie
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
+    // Apply settings from cookies
+    function applySettingsFromCookies() {
+        // Apply selected skill
+        let selectedSkill = getCookie('selectedSkill');
+        if (selectedSkill) {
+            $('#skillSelect').val(selectedSkill);
+        }
+
+        // Apply sort by option
+        let sortBy = getCookie('sortBy');
+        if (sortBy) {
+            $('#sortToggle').val(sortBy);
+        }
+
+        // Apply pet skill filter
+        let petSkillFilter = getCookie('petSkillFilter');
+        if (petSkillFilter) {
+            $('#petSkillFilter').val(petSkillFilter);
+        }
+
+         // Apply rarity button filters
+        let activeRarities = getCookie('activeRarities');
+        console.log('Loading active rarities from cookie:', activeRarities);
+        if (activeRarities) {
+            // Deactivate all filters first
+            $('.filter-button').removeClass('active').addClass('inactive');
+            // Then activate only the ones saved in the cookie
+            activeRarities.split(',').forEach(function(rarity) {
+                console.log('Activating rarity:', rarity);
+                $(`.filter-button[data-value="${rarity}"]`).addClass('active').removeClass('inactive');
+            });
+        } else {
+            // If no cookie is set, activate all filters by default
+            $('.filter-button').addClass('active').removeClass('inactive');
+        }
+
+        // Apply compact mode
+        let isCompact = getCookie('compactMode') === 'true';
+        applyCompactMode(isCompact);
+    }
+
     // Perform initial analysis when page loads
+    applySettingsFromCookies();
     analyzeAuctions();
 
     // Function to analyze auctions
@@ -47,7 +119,10 @@ $(document).ready(function() {
 
     // Event listeners for buttons and dropdowns
     $('#analyzeButton').click(analyzeAuctions);
-    $('#skillSelect').change(analyzeAuctions);
+    $('#skillSelect').change(function() {
+        setCookie('selectedSkill', $(this).val(), 30);
+        analyzeAuctions();
+    });
 
     $('#searchButton').click(function() {
         const searchTerm = $('#searchInput').val();
@@ -64,10 +139,43 @@ $(document).ready(function() {
 
     $('.filter-button').on('click', function() {
         $(this).toggleClass('active inactive');
+        let activeRarities = $('.filter-button.active').map(function() {
+            return $(this).data('value');
+        }).get();
+        console.log('Saving active rarities to cookie:', activeRarities);
+        if (activeRarities.length > 0) {
+            setCookie('activeRarities', activeRarities.join(','), 30);
+        } else {
+            // If no filters are active, remove the cookie
+            document.cookie = "activeRarities=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        }
         sortAndDisplayResults();
     });
 
-    $('#sortToggle, #petSkillFilter').change(sortAndDisplayResults);
+    $('#sortToggle').change(function() {
+        setCookie('sortBy', $(this).val(), 30);
+        sortAndDisplayResults();
+    });
+
+    $('#petSkillFilter').change(function() {
+        setCookie('petSkillFilter', $(this).val(), 30);
+        sortAndDisplayResults();
+    });
+
+    function initializeFilters() {
+        let activeRarities = getCookie('activeRarities');
+        if (activeRarities) {
+            // Deactivate all filters first
+            $('.filter-button').removeClass('active').addClass('inactive');
+            // Then activate only the ones saved in the cookie
+            activeRarities.split(',').forEach(function(rarity) {
+                $(`.filter-button[data-value="${rarity}"]`).addClass('active').removeClass('inactive');
+            });
+        } else {
+            // If no cookie is set, activate all filters by default
+            $('.filter-button').addClass('active').removeClass('inactive');
+        }
+    }
 
     // Function to sort and display results
     function sortAndDisplayResults() {
@@ -94,29 +202,6 @@ $(document).ready(function() {
         return data.sort((a, b) => b[sortBy] - a[sortBy]);
     }
 
-    // Function to set a cookie
-    function setCookie(name, value, days) {
-        var expires = "";
-        if (days) {
-            var date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
-        }
-        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
-    }
-
-    // Function to get a cookie
-    function getCookie(name) {
-        var nameEQ = name + "=";
-        var ca = document.cookie.split(';');
-        for(var i=0;i < ca.length;i++) {
-            var c = ca[i];
-            while (c.charAt(0)==' ') c = c.substring(1,c.length);
-            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
-        }
-        return null;
-    }
-
     // Function to apply compact mode
     function applyCompactMode(isCompact) {
         if (isCompact) {
@@ -127,10 +212,6 @@ $(document).ready(function() {
             $('#results').removeClass('compact-mode');
         }
     }
-
-    // Check cookie and apply compact mode on page load
-    var isCompact = getCookie('compactMode') === 'true';
-    applyCompactMode(isCompact);
 
     // Compact Mode button functionality
     $('#compactModeButton').click(function() {
@@ -143,12 +224,12 @@ $(document).ready(function() {
     $('#results').on('click', '.pet-item', function(e) {
         if ($('#results').hasClass('compact-mode')) {
             // Check if the click was on a copy button
-        if (!$(e.target).closest('.copy-button').length) {
-            $(this).toggleClass('expanded');
+            if (!$(e.target).closest('.copy-button').length) {
+                $(this).toggleClass('expanded');
+            }
+            // We don't prevent default here, as we want the copy functionality to work
         }
-        // We don't prevent default here, as we want the copy functionality to work
-    }
-});
+    });
 
     function displayResults(data) {
         console.log('Displaying results:', data);
