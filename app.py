@@ -12,7 +12,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
-
+from flask import send_from_directory
 
 # Initialize the database
 def init_db():
@@ -64,6 +64,10 @@ XP_REQUIRED = {
     "MYTHIC": 25353230
 }
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
