@@ -237,3 +237,31 @@ body {
   .compact-mode .pet-item.expanded .pet-details {
     display: block;
   }
+
+.pet-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.number-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #cbd5e0;
+    margin-left: 20px;
+}
+
+.pet-item > div:first-child {
+    padding-left: 40px;
+}

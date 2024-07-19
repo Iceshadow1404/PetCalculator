@@ -234,12 +234,17 @@ $(document).ready(function() {
     function displayResults(data) {
         console.log('Displaying results:', data);
         var resultsHtml = '';
-        data.forEach(function(item) {
+        data.forEach(function(item, index) {
             resultsHtml += `
                 <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item" data-item='${JSON.stringify(item)}'>
-                    <div class="flex items-center justify-center mb-4">
-                        <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
-                        <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
+                    <div class="flex items-center">
+                        <div class="number-container">
+                            <span class="number">#${index + 1}</span>
+                        </div>
+                        <div class="flex-grow flex items-center justify-center mb-4">
+                            <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
+                            <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
+                        </div>
                     </div>
                     <div class="pet-details">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
