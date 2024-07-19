@@ -235,8 +235,21 @@ $(document).ready(function() {
         console.log('Displaying results:', data);
         var resultsHtml = '';
         data.forEach(function(item, index) {
+            // Calculate the price difference percentage
+            const currentPrice = item.high_price;
+            const avgPrice = item.high_day_avg;
+            const priceDiffPercentage = ((currentPrice - avgPrice) / currentPrice) * 100;
+            
+            // Determine if we should apply the red outline
+            const applyRedOutline = priceDiffPercentage >= 5;
+            
+            let outlineInfo = '';
+            if (applyRedOutline) {
+                outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% cheaper!</div>`;
+            }
+    
             resultsHtml += `
-                <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item" data-item='${JSON.stringify(item)}'>
+                <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item ${applyRedOutline ? 'red-outline' : ''}" data-item='${JSON.stringify(item)}'>
                     <div class="flex items-center">
                         <div class="number-container">
                             <span class="number">#${index + 1}</span>
@@ -246,6 +259,7 @@ $(document).ready(function() {
                             <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
                         </div>
                     </div>
+                    ${outlineInfo}
                     <div class="pet-details">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="text-center">

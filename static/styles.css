@@ -238,6 +238,8 @@ body {
     display: block;
   }
 
+/* Pet Number */  
+
 .pet-item {
     position: relative;
     display: flex;
@@ -264,4 +266,10 @@ body {
 
 .pet-item > div:first-child {
     padding-left: 40px;
+}
+
+/* Outline */ 
+
+.red-outline {
+    outline: 3px solid red;
 }
