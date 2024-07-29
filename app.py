@@ -110,7 +110,7 @@ def analyze_auctions():
 @app.route('/search', methods=['POST'])
 @login_required
 def search_pet():
-    search_term = request.form.get('search_term', '').strip().lower()
+    search_term = request.form.get('search_term', '').strip()
     selected_skill = request.form.get('skill', DEFAULT_SKILL)
 
     conn = sqlite3.connect('pet_prices.db')
@@ -140,6 +140,10 @@ def search_pet():
 
     for row in results:
         pet_name, rarity, low_price, high_price, low_uuid, high_uuid, low_day_avg, low_week_avg, high_day_avg, high_week_avg = row
+
+        # Ensure low_price and high_price are not None
+        if low_price is None or high_price is None:
+            continue
 
         # Find the skill for this pet
         skill = next((key for category in pet_list for key, pets in category.items() if pet_name in pets), None)
@@ -188,7 +192,8 @@ def search_pet():
         })
 
     output_list.sort(key=lambda x: x["coins_per_xp"], reverse=True)
-    retu
+    return jsonify(output_list)
+
 
 
 @app.route('/images/pets/<path:filename>')
