@@ -1,3 +1,5 @@
+import time
+
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for, session
 from functools import wraps
 import json
@@ -19,15 +21,20 @@ def init_db():
     conn = sqlite3.connect('pet_prices.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS pet_prices
-                 (pet_name TEXT, tier TEXT, level TEXT, price INTEGER, timestamp DATETIME)''')
+                 (pet_name TEXT, rarity TEXT, level TEXT, price INTEGER, timestamp DATETIME, uuid TEXT)''')
     c.execute('''CREATE INDEX IF NOT EXISTS idx_pet_prices ON pet_prices 
-                 (pet_name, tier, level, timestamp)''')
+                 (pet_name, rarity, level, timestamp)''')
     conn.commit()
     conn.close()
 
+def reset_db():
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS pet_prices")
+    conn.commit()
+    conn.close()
+    init_db()
 
-# Call this function when your app starts
-init_db()
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -105,11 +112,83 @@ def analyze_auctions():
 def search_pet():
     search_term = request.form.get('search_term', '').strip().lower()
     selected_skill = request.form.get('skill', DEFAULT_SKILL)
+
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+
+    query = """
+    SELECT pet_name, rarity, 
+           MIN(CASE WHEN level = 'low' THEN price END) as low_price,
+           MAX(CASE WHEN level = 'high' THEN price END) as high_price,
+           MIN(CASE WHEN level = 'low' THEN uuid END) as low_uuid,
+           MAX(CASE WHEN level = 'high' THEN uuid END) as high_uuid,
+           AVG(CASE WHEN level = 'low' AND timestamp > datetime('now', '-1 day') THEN price END) as low_day_avg,
+           AVG(CASE WHEN level = 'low' AND timestamp > datetime('now', '-7 day') THEN price END) as low_week_avg,
+           AVG(CASE WHEN level = 'high' AND timestamp > datetime('now', '-1 day') THEN price END) as high_day_avg,
+           AVG(CASE WHEN level = 'high' AND timestamp > datetime('now', '-7 day') THEN price END) as high_week_avg
+    FROM pet_prices
+    WHERE LOWER(pet_name) LIKE ?
+    GROUP BY pet_name, rarity
+    """
+
+    c.execute(query, (f"%{search_term}%",))
+    results = c.fetchall()
+    conn.close()
+
     pet_list = load_pet_list("petlist.json")
-    filtered_pet_list = filter_pets_by_name(pet_list, search_term)
-    total_auctions = asyncio.run(fetch_auctions())
-    output_list = calculate_profit(filtered_pet_list, total_auctions, selected_skill)
-    return jsonify(output_list)
+    output_list = []
+
+    for row in results:
+        pet_name, rarity, low_price, high_price, low_uuid, high_uuid, low_day_avg, low_week_avg, high_day_avg, high_week_avg = row
+
+        # Find the skill for this pet
+        skill = next((key for category in pet_list for key, pets in category.items() if pet_name in pets), None)
+
+        if skill is None:
+            continue  # Skip this pet if we can't determine its skill
+
+        if pet_name == "Golden Dragon":
+            xp_required = get_golden_dragon_xp()
+        else:
+            xp_required = XP_REQUIRED[rarity]
+
+        gross_profit = high_price - low_price
+        ah_tax = calculate_ah_tax(high_price)
+        claim_tax = gross_profit * 0.01
+        net_profit = gross_profit - ah_tax - claim_tax
+        profit_without_tax = gross_profit
+
+        coins_per_xp = net_profit / xp_required if xp_required else 0
+        coins_per_xp = round(coins_per_xp, 2)
+
+        coins_per_xp_note = None
+        if selected_skill in ["Mining", "Fishing", "Combat", "Farming", "Foraging"] and skill != selected_skill:
+            coins_per_xp /= 4
+            coins_per_xp_note = f" /4 because its not a {selected_skill} Pet"
+        elif selected_skill in ["Enchanting", "Alchemy"] and skill != selected_skill:
+            coins_per_xp /= 12
+            coins_per_xp_note = f" /12 not a {selected_skill} Pet"
+
+        output_list.append({
+            "name": pet_name,
+            "rarity": rarity,
+            "profit": int(net_profit),
+            "profit_without_tax": int(profit_without_tax),
+            "coins_per_xp": coins_per_xp,
+            "coins_per_xp_note": coins_per_xp_note,
+            "low_price": low_price,
+            "high_price": high_price,
+            "low_uuid": low_uuid,
+            "high_uuid": high_uuid,
+            "skill": skill,
+            "low_day_avg": low_day_avg,
+            "low_week_avg": low_week_avg,
+            "high_day_avg": high_day_avg,
+            "high_week_avg": high_week_avg
+        })
+
+    output_list.sort(key=lambda x: x["coins_per_xp"], reverse=True)
+    retu
 
 
 @app.route('/images/pets/<path:filename>')
@@ -129,7 +208,7 @@ async def fetch_auctions():
                 total_pages = data["totalPages"]
 
                 # Fetch pages in batches to avoid overwhelming the server
-                batch_size = 40
+                batch_size = 1
                 logging.info("Starting API Calls")
                 for i in range(0, total_pages, batch_size):
                     logging.debug(f"Fetching batch starting at page {i}")
@@ -169,10 +248,78 @@ async def fetch_page(session, page, total_pages):
 
 async def fetch_and_analyze_auctions(selected_skill):
     pet_list = load_pet_list("petlist.json")
-    total_auctions = await fetch_auctions()
-    output_list = calculate_profit(pet_list, total_auctions, selected_skill)
+    pet_data = fetch_pet_data_from_db()
+    output_list = calculate_profit_from_db(pet_list, pet_data, selected_skill)
     return output_list
 
+
+def calculate_profit_from_db(pet_list, pet_data, selected_skill):
+    logging.debug(f"Pet data structure: {json.dumps(pet_data, indent=2)}")
+    new_pet_list = []
+    for category in pet_list:
+        for key, pets in category.items():
+            for pet in pets:
+                if pet not in pet_data:
+                    logging.debug(f"Pet {pet} not found in pet_data")
+                    continue
+
+                for rarity, pet_info in pet_data[pet].items():
+                    logging.debug(f"Processing {pet} with rarity {rarity}")
+
+                    if pet == "Golden Dragon":
+                        xp_required = get_golden_dragon_xp()
+                    else:
+                        xp_required = XP_REQUIRED[rarity]
+
+                    low_price = pet_info.get("low_price", 0)
+                    high_price = pet_info.get("high_price", 0)
+                    low_uuid = pet_info.get("low_uuid", "N/A")
+                    high_uuid = pet_info.get("high_uuid", "N/A")
+                    low_day_avg = pet_info.get("low_day_avg", 0)
+                    low_week_avg = pet_info.get("low_week_avg", 0)
+                    high_day_avg = pet_info.get("high_day_avg", 0)
+                    high_week_avg = pet_info.get("high_week_avg", 0)
+
+                    # Only calculate profit if both low and high prices are available for the same rarity
+                    if low_price and high_price:
+                        gross_profit = high_price - low_price
+                        ah_tax = calculate_ah_tax(high_price)
+                        claim_tax = gross_profit * 0.01
+                        net_profit = gross_profit - ah_tax - claim_tax
+                        profit_without_tax = gross_profit
+
+                        coins_per_xp = net_profit / xp_required if xp_required else 0
+                        coins_per_xp = round(coins_per_xp, 2)
+
+                        coins_per_xp_note = None
+                        if selected_skill in ["Mining", "Fishing", "Combat", "Farming",
+                                              "Foraging"] and key != selected_skill:
+                            coins_per_xp /= 4
+                            coins_per_xp_note = f" /4 because its not a {selected_skill} Pet"
+                        elif selected_skill in ["Enchanting", "Alchemy"] and key != selected_skill:
+                            coins_per_xp /= 12
+                            coins_per_xp_note = f" /12 not a {selected_skill} Pet"
+
+                        new_pet_list.append({
+                            "name": pet,
+                            "rarity": rarity,
+                            "profit": int(net_profit),
+                            "profit_without_tax": int(profit_without_tax),
+                            "coins_per_xp": coins_per_xp,
+                            "coins_per_xp_note": coins_per_xp_note,
+                            "low_price": low_price,
+                            "high_price": high_price,
+                            "low_uuid": low_uuid,
+                            "high_uuid": high_uuid,
+                            "skill": key,
+                            "low_day_avg": low_day_avg,
+                            "low_week_avg": low_week_avg,
+                            "high_day_avg": high_day_avg,
+                            "high_week_avg": high_week_avg
+                        })
+
+    new_pet_list.sort(key=lambda x: x["coins_per_xp"], reverse=True)
+    return new_pet_list
 
 def load_pet_list(file_path):
     with open(file_path, "r") as f:
@@ -303,12 +450,12 @@ def get_average_prices_batch(pet_data):
 
     placeholders = ','.join(['(?,?,?)' for _ in pet_data])
     query = f"""
-    SELECT pet_name, tier, level,
+    SELECT pet_name, rarity, level,
            AVG(CASE WHEN timestamp > ? THEN price ELSE NULL END) as day_avg,
            AVG(CASE WHEN timestamp > ? THEN price ELSE NULL END) as week_avg
     FROM pet_prices
-    WHERE (pet_name, tier, level) IN ({placeholders})
-    GROUP BY pet_name, tier, level
+    WHERE (pet_name, rarity, level) IN ({placeholders})
+    GROUP BY pet_name, rarity, level
     """
 
     params = [day_ago, week_ago]
@@ -320,6 +467,44 @@ def get_average_prices_batch(pet_data):
     conn.close()
     return {(row[0], row[1], row[2]): (row[3], row[4]) for row in results}
 
+
+def fetch_pet_data_from_db():
+    logging.debug("Starting fetch_pet_data_from_db")
+    conn = sqlite3.connect('pet_prices.db')
+    c = conn.cursor()
+
+    c.execute("""
+    SELECT pet_name, rarity, level, price, uuid,
+           AVG(CASE WHEN timestamp > datetime('now', '-1 day') THEN price ELSE NULL END) OVER (PARTITION BY pet_name, rarity, level) as day_avg,
+           AVG(CASE WHEN timestamp > datetime('now', '-7 day') THEN price ELSE NULL END) OVER (PARTITION BY pet_name, rarity, level) as week_avg
+    FROM pet_prices
+    WHERE (pet_name, rarity, level, timestamp) IN (
+        SELECT pet_name, rarity, level, MAX(timestamp)
+        FROM pet_prices
+        GROUP BY pet_name, rarity, level
+    )
+    """)
+
+    results = c.fetchall()
+    conn.close()
+
+    pet_data = {}
+    for row in results:
+        pet_name, rarity, level, price, uuid, day_avg, week_avg = row
+        if pet_name not in pet_data:
+            pet_data[pet_name] = {}
+        if rarity not in pet_data[pet_name]:
+            pet_data[pet_name][rarity] = {}
+        pet_data[pet_name][rarity][f"{level}_price"] = price
+        pet_data[pet_name][rarity][f"{level}_uuid"] = uuid
+        pet_data[pet_name][rarity][f"{level}_day_avg"] = day_avg
+        pet_data[pet_name][rarity][f"{level}_week_avg"] = week_avg
+
+    logging.debug(f"Fetched data for {len(pet_data)} pets")
+    for pet, rarities in pet_data.items():
+        logging.debug(f"Pet: {pet}, Rarities: {list(rarities.keys())}")
+
+    return pet_data
 
 def update_pet_prices():
     print("Starting update_pet_prices")
@@ -354,11 +539,13 @@ def update_pet_prices():
                     high_pet = find_min_auction(auctions_by_category.get((tier, high_lvl), []))
 
                     if low_pet:
-                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?)",
-                                  (pet, tier, "low", low_pet["starting_bid"], datetime.now()))
+                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
+                                  (pet, tier, "low", low_pet["starting_bid"], datetime.now(),
+                                   low_pet.get("uuid", "N/A")))
                     if high_pet:
-                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?)",
-                                  (pet, tier, "high", high_pet["starting_bid"], datetime.now()))
+                        c.execute("INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
+                                  (pet, tier, "high", high_pet["starting_bid"], datetime.now(),
+                                   high_pet.get("uuid", "N/A")))
 
     conn.commit()
     conn.close()
@@ -369,14 +556,19 @@ def find_min_auction(auctions):
     return min((a for a in auctions if "Tier Boost" not in a.get("item_lore", "")),
                key=lambda x: x["starting_bid"], default=None)
 
-
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_pet_prices, trigger="interval", minutes=15)
+scheduler.add_job(func=update_pet_prices, trigger="interval", minutes=5)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == '__main__':
+    pet_data = fetch_pet_data_from_db()
+    logging.debug("Pet data structure:")
+    logging.debug(json.dumps(pet_data, indent=2))
+
+    init_db()
+    app.run(host="0.0.0.0", port=8000, debug=True)
+    #update_pet_prices()
     if not os.path.exists('images/pets'):
         os.makedirs('images/pets')
-    app.run(host="0.0.0.0", port=8000, debug=True)

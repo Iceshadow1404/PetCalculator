@@ -192,13 +192,17 @@ $(document).ready(function() {
         let activeRarities = $('.filter-button.active').map(function() {
             return $(this).data('value');
         }).get();
-        return (skillFilter === 'All' || item.skill === skillFilter) && activeRarities.includes(item.tier);
+        return (skillFilter === 'All' || item.skill === skillFilter) && activeRarities.includes(item.rarity);
     }
 
     // Function to sort results based on selected criteria
     function sortResults(data) {
         let sortBy = $('#sortToggle').val();
-        return data.sort((a, b) => b[sortBy] - a[sortBy]);
+        
+        return data.sort((a, b) => {
+            // Sort directly by the selected criteria
+            return b[sortBy] - a[sortBy];
+        });
     }
 
     // Function to apply compact mode
@@ -234,28 +238,30 @@ $(document).ready(function() {
         console.log('Displaying results:', data);
         var resultsHtml = '';
         data.forEach(function(item, index) {
+            console.log(`Item ${index}: name=${item.name}, rarity=${item.rarity}`);    
+    
             // Calculate the price difference percentage
             const currentPrice = item.high_price;
             const avgPrice = item.high_day_avg;
-            const priceDiffPercentage = ((currentPrice - avgPrice) / currentPrice) * 100;
+            const priceDiffPercentage = ((currentPrice - avgPrice) / avgPrice) * 100;
             
             // Determine if we should apply the red outline
             const applyRedOutline = priceDiffPercentage >= 5;
             
             let outlineInfo = '';
             if (applyRedOutline) {
-                outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% cheaper!</div>`;
+                outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% higher!</div>`;
             }
     
             resultsHtml += `
-                <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item ${applyRedOutline ? 'red-outline' : ''}" data-item='${JSON.stringify(item)}'>
-                    <div class="flex items-center">
-                        <div class="number-container">
-                            <span class="number">#${index + 1}</span>
-                        </div>
-                        <div class="flex-grow flex items-center justify-center mb-4">
-                            <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
-                            <h3 class="text-2xl font-bold text-${item.tier.toLowerCase()}">${item.name} (${item.tier})</h3>
+            <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item ${applyRedOutline ? 'red-outline' : ''}" data-item='${JSON.stringify(item)}'>
+                <div class="flex items-center">
+                    <div class="number-container">
+                        <span class="number">#${index + 1}</span>
+                    </div>
+                    <div class="flex-grow flex items-center justify-center mb-4">
+                        <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
+                        <h3 class="text-2xl font-bold text-${item.rarity.toLowerCase()}">${item.name} (${item.rarity})</h3>
                         </div>
                     </div>
                     ${outlineInfo}
