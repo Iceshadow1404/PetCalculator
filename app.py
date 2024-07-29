@@ -130,14 +130,16 @@ async def fetch_auctions():
 
                 # Fetch pages in batches to avoid overwhelming the server
                 batch_size = 40
+                logging.info("Starting API Calls")
                 for i in range(0, total_pages, batch_size):
-                    batch_tasks = [fetch_page(session, page, total_pages) for page in
-                                   range(i, min(i + batch_size, total_pages))]
+                    logging.debug(f"Fetching batch starting at page {i}")
+                    batch_tasks = [fetch_page(session, page, total_pages) for page in range(i, min(i + batch_size, total_pages))]
                     batch_results = await asyncio.gather(*batch_tasks)
+
                     for result in batch_results:
                         total_auctions.extend(result)
 
-        logging.info("Fetch complete. Starting analysis...")
+                logging.info(f"Fetched {len(total_auctions)} auctions across {total_pages} pages")
     except Exception as e:
         logging.error(f"Error fetching auctions: {str(e)}")
 
@@ -145,22 +147,24 @@ async def fetch_auctions():
 
 
 async def fetch_page(session, page, total_pages):
-    retries = 3
-    for attempt in range(retries):
-        try:
-            async with session.get(f"{API_URL}?page={page}") as response:
-                data = await response.json()
-                if "auctions" in data:
-                    return data["auctions"]
-                else:
-                    logging.warning(f"Page {page + 1} has no 'auctions'")
-                    return []
-        except Exception as e:
-            if attempt < retries - 1:
-                await asyncio.sleep(1)  # Wait for 1 second before retrying
-            else:
-                logging.error(f"Error fetching page {page + 1} after {retries} attempts: {str(e)}")
+    page_url = f"{API_URL}?page={page}"
+    try:
+        async with session.get(page_url) as response:
+            logging.debug(f"Fetching page {page}/{total_pages}")
+            if response.status != 200:
+                logging.error(f"Failed to fetch page {page}: {response.status}")
                 return []
+
+            data = await response.json()
+            if "auctions" not in data:
+                logging.error(f"Invalid API response on page {page}: 'auctions' missing")
+                return []
+
+            logging.debug(f"Successfully fetched page {page}")
+            return data["auctions"]
+    except Exception as e:
+        logging.error(f"Exception while fetching page {page}: {str(e)}")
+        return []
 
 
 async def fetch_and_analyze_auctions(selected_skill):

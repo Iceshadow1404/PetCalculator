@@ -95,7 +95,6 @@ $(document).ready(function() {
 
     // Perform initial analysis when page loads
     applySettingsFromCookies();
-    analyzeAuctions();
 
     // Function to analyze auctions
     function analyzeAuctions() {
