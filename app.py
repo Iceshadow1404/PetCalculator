@@ -692,15 +692,25 @@ def trigger_update():
     success = update_pet_prices()
     return jsonify({"success": success, "last_update_time": last_update_time.isoformat() if last_update_time else None})
 
+
 @app.route("/test_timer")
 def test_timer():
     global last_update_time
+    current_time = datetime.now()
+
     if not last_update_time:
-        last_update_time = datetime.now()
-    next_update = last_update_time + timedelta(minutes=5)
+        next_update = current_time
+    else:
+        time_since_last_update = current_time - last_update_time
+        minutes_since_last_update = time_since_last_update.total_seconds() / 60
+        minutes_until_next_update = 5 - (minutes_since_last_update % 5)
+        next_update = current_time + timedelta(minutes=minutes_until_next_update)
+
     return jsonify({
-        "last_update": last_update_time.isoformat(),
-        "next_update": next_update.isoformat()
+        "current_time": current_time.isoformat(),
+        "last_update": last_update_time.isoformat() if last_update_time else None,
+        "next_update": next_update.isoformat(),
+        "seconds_until_next_update": (next_update - current_time).total_seconds()
     })
 
 if not hasattr(app, "scheduler"):
