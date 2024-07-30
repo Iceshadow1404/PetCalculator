@@ -321,28 +321,36 @@ $(document).ready(function() {
     }
 
     function updateTimer() {
-        $.get('/last_update_time', function(data) {
-            if (data.last_update) {
-
-                const lastUpdate = new Date(data.last_update);
-                const nextUpdate = new Date(data.next_update);
-                const now = new Date();
-
-                $('#lastUpdateTime').text(formatDate(lastUpdate));
-                if (nextUpdate > now) {
-                    location.reload();
-                    const timeLeft = Math.floor((nextUpdate - now) / 1000);
-                    $('#nextUpdateTime').text(formatTimeLeft(timeLeft));
-                    setTimeout(updateTimer, 1000);
-                } else {
-                    $('#nextUpdateTime').text('Updating soon...');
-                    setTimeout(updateTimer, 5000);
-                }
+        $.get('/test_timer', function(data) {
+            $('#lastUpdateTime').text(new Date(data.last_update).toLocaleString());
+            
+            const timeLeft = Math.floor((new Date(data.next_update) - new Date()) / 1000);
+            $('#nextUpdateTime').text(formatTimeLeft(timeLeft));
+            
+            if (timeLeft <= 0) {
+                console.log("Update time reached, triggering update...");
+                triggerUpdate();
             } else {
-                $('#lastUpdateTime').text('Not yet updated');
-                $('#nextUpdateTime').text('Updating soon...');
-                setTimeout(updateTimer, 5000);
+                setTimeout(updateTimer, 1000);
             }
+        }).fail(function(jqXHR, textStatus, errorThrown) {
+            console.error("Error fetching timer data:", textStatus, errorThrown);
+            setTimeout(updateTimer, 5000);
+        });
+    }
+
+    function triggerUpdate() {
+        $.post('/trigger_update', function(data) {
+            if (data.success) {
+                console.log("Update successful, reloading page...");
+                location.reload();
+            } else {
+                console.error("Update failed, retrying in 5 seconds...");
+                setTimeout(triggerUpdate, 5000);
+            }
+        }).fail(function(jqXHR, textStatus, errorThrown) {
+            console.error("Error triggering update:", textStatus, errorThrown);
+            setTimeout(triggerUpdate, 5000);
         });
     }
 

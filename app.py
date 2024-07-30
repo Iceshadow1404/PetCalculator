@@ -8,6 +8,7 @@ from flask import (
     url_for,
     session,
 )
+import requests
 from functools import wraps
 import time
 import json
@@ -223,58 +224,47 @@ async def fetch_auctions():
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(API_URL) as response:
+                if response.status != 200:
+                    logging.error(f"Failed to fetch initial page: HTTP {response.status}")
+                    return []
+
                 data = await response.json()
                 if "totalPages" not in data or "auctions" not in data:
-                    raise ValueError(
-                        "Invalid API response: 'totalPages' or 'auctions' missing"
-                    )
+                    logging.error("Invalid API response: 'totalPages' or 'auctions' missing")
+                    return []
 
                 total_pages = data["totalPages"]
+                total_auctions.extend(data["auctions"])
+                logging.info(f"Fetching {total_pages} pages of auctions")
 
-                # Fetch pages in batches to avoid overwhelming the server
-                batch_size = 40
-                logging.info("Starting API Calls")
-                for i in range(0, total_pages, batch_size):
-                    logging.debug(f"Fetching batch starting at page {i}")
-                    batch_tasks = [
-                        fetch_page(session, page, total_pages)
-                        for page in range(i, min(i + batch_size, total_pages))
-                    ]
-                    batch_results = await asyncio.gather(*batch_tasks)
+                tasks = [fetch_page(session, page, total_pages) for page in range(1, total_pages)]
+                results = await asyncio.gather(*tasks)
+                for page_auctions in results:
+                    total_auctions.extend(page_auctions)
 
-                    for result in batch_results:
-                        total_auctions.extend(result)
-
-                logging.info(
-                    f"Fetched {len(total_auctions)} auctions across {total_pages} pages"
-                )
+        logging.info(f"Fetched a total of {len(total_auctions)} auctions")
+        return total_auctions
     except Exception as e:
         logging.error(f"Error fetching auctions: {str(e)}")
-
-    return total_auctions
+        return []
 
 
 async def fetch_page(session, page, total_pages):
-    page_url = f"{API_URL}?page={page}"
+    url = f"{API_URL}?page={page}"
     try:
-        async with session.get(page_url) as response:
-            logging.debug(f"Fetching page {page}/{total_pages}")
-            if response.status != 200:
-                logging.error(f"Failed to fetch page {page}: {response.status}")
-                return []
-
-            data = await response.json()
-            if "auctions" not in data:
-                logging.error(
-                    f"Invalid API response on page {page}: 'auctions' missing"
-                )
-                return []
-
-            logging.debug(f"Successfully fetched page {page}")
-            return data["auctions"]
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                if "auctions" in data:
+                    logging.info(f"Successfully fetched page {page}/{total_pages}")
+                    return data["auctions"]
+                else:
+                    logging.error(f"Invalid API response on page {page}: 'auctions' missing")
+            else:
+                logging.error(f"Failed to fetch page {page}: HTTP {response.status}")
     except Exception as e:
         logging.error(f"Exception while fetching page {page}: {str(e)}")
-        return []
+    return []
 
 
 async def fetch_and_analyze_auctions(selected_skill):
@@ -618,73 +608,77 @@ def get_last_update_time():
 def update_pet_prices():
     global last_update_time
     print("Starting update_pet_prices")
-    pet_list = load_pet_list("petlist.json")
-    print("Pet list loaded")
-    total_auctions = asyncio.run(fetch_auctions())
-    print(f"Fetched {len(total_auctions)} auctions")
+    try:
+        pet_list = load_pet_list("petlist.json")
+        print("Pet list loaded")
+        total_auctions = asyncio.run(fetch_auctions())
+        print(f"Fetched {len(total_auctions)} auctions")
 
-    auctions_by_category = defaultdict(list)
-    for auction in total_auctions:
-        if not auction.get("bin"):
-            continue
-        tier = auction.get("tier")
-        item_name = auction.get("item_name")
-        auctions_by_category[(tier, item_name)].append(auction)
+        auctions_by_category = defaultdict(list)
+        for auction in total_auctions:
+            if not auction.get("bin"):
+                continue
+            tier = auction.get("tier")
+            item_name = auction.get("item_name")
+            auctions_by_category[(tier, item_name)].append(auction)
 
-    print(f"Categorized {len(auctions_by_category)} auction types")
+        print(f"Categorized {len(auctions_by_category)} auction types")
 
-    conn = sqlite3.connect("pet_prices.db")
-    c = conn.cursor()
+        conn = sqlite3.connect("pet_prices.db")
+        c = conn.cursor()
 
-    for category in pet_list:
-        for key, pets in category.items():
-            for tier in RARITY_COLORS.keys():
-                for pet in pets:
-                    if pet == "Golden Dragon":
-                        low_lvl, high_lvl = (
-                            "[Lvl 102] Golden Dragon",
-                            "[Lvl 200] Golden Dragon",
+        for category in pet_list:
+            for key, pets in category.items():
+                for tier in RARITY_COLORS.keys():
+                    for pet in pets:
+                        if pet == "Golden Dragon":
+                            low_lvl, high_lvl = (
+                                "[Lvl 102] Golden Dragon",
+                                "[Lvl 200] Golden Dragon",
+                            )
+                        else:
+                            low_lvl, high_lvl = f"[Lvl 1] {pet}", f"[Lvl 100] {pet}"
+
+                        low_pet = find_min_auction(
+                            auctions_by_category.get((tier, low_lvl), [])
                         )
-                    else:
-                        low_lvl, high_lvl = f"[Lvl 1] {pet}", f"[Lvl 100] {pet}"
-
-                    low_pet = find_min_auction(
-                        auctions_by_category.get((tier, low_lvl), [])
-                    )
-                    high_pet = find_min_auction(
-                        auctions_by_category.get((tier, high_lvl), [])
-                    )
-
-                    if low_pet:
-                        c.execute(
-                            "INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
-                            (
-                                pet,
-                                tier,
-                                "low",
-                                low_pet["starting_bid"],
-                                datetime.now(),
-                                low_pet.get("uuid", "N/A"),
-                            ),
-                        )
-                    if high_pet:
-                        c.execute(
-                            "INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
-                            (
-                                pet,
-                                tier,
-                                "high",
-                                high_pet["starting_bid"],
-                                datetime.now(),
-                                high_pet.get("uuid", "N/A"),
-                            ),
+                        high_pet = find_min_auction(
+                            auctions_by_category.get((tier, high_lvl), [])
                         )
 
-    conn.commit()
-    conn.close()
-    last_update_time = datetime.now()
-    print("Pet prices updated successfully")
+                        if low_pet:
+                            c.execute(
+                                "INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
+                                (
+                                    pet,
+                                    tier,
+                                    "low",
+                                    low_pet["starting_bid"],
+                                    datetime.now(),
+                                    low_pet.get("uuid", "N/A"),
+                                ),
+                            )
+                        if high_pet:
+                            c.execute(
+                                "INSERT INTO pet_prices VALUES (?, ?, ?, ?, ?, ?)",
+                                (
+                                    pet,
+                                    tier,
+                                    "high",
+                                    high_pet["starting_bid"],
+                                    datetime.now(),
+                                    high_pet.get("uuid", "N/A"),
+                                ),
+                            )
 
+        conn.commit()
+        conn.close()
+        last_update_time = datetime.now()
+        print("Pet prices updated successfully")
+        return True
+    except Exception as e:
+        logging.error(f"Error in update_pet_prices: {str(e)}")
+        return False
 
 def find_min_auction(auctions):
     return min(
@@ -693,6 +687,21 @@ def find_min_auction(auctions):
         default=None,
     )
 
+@app.route("/trigger_update", methods=["POST"])
+def trigger_update():
+    success = update_pet_prices()
+    return jsonify({"success": success, "last_update_time": last_update_time.isoformat() if last_update_time else None})
+
+@app.route("/test_timer")
+def test_timer():
+    global last_update_time
+    if not last_update_time:
+        last_update_time = datetime.now()
+    next_update = last_update_time + timedelta(minutes=5)
+    return jsonify({
+        "last_update": last_update_time.isoformat(),
+        "next_update": next_update.isoformat()
+    })
 
 if not hasattr(app, "scheduler"):
     app.scheduler = BackgroundScheduler()
