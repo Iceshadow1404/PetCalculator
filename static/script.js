@@ -104,7 +104,9 @@ $(document).ready(function() {
         $('#loading').show();
         $('#results').hide();
         console.log('Sending request to /analyze');
-        $.post('/analyze', { skill: selectedSkill }, function(data) {
+        $.post('/analyze', {
+            skill: selectedSkill
+        }, function(data) {
             console.log('Received response from /analyze', data);
             storedResults = data;
             sortAndDisplayResults();
@@ -130,7 +132,10 @@ $(document).ready(function() {
         const selectedSkill = $('#skillSelect').val();
         $('#loading').show();
         $('#results').hide();
-        $.post('/search', { search_term: searchTerm, skill: selectedSkill }, function(data) {
+        $.post('/search', {
+            search_term: searchTerm,
+            skill: selectedSkill
+        }, function(data) {
             storedResults = data;
             sortAndDisplayResults();
             $('#loading').hide();
@@ -240,15 +245,15 @@ $(document).ready(function() {
         var resultsHtml = '';
         data.forEach(function(item, index) {
             console.log(`Item ${index}: name=${item.name}, rarity=${item.rarity}`);
-            
+
             // Calculate the price difference percentage
             const currentPrice = item.high_price;
             const avgPrice = item.high_day_avg;
             const priceDiffPercentage = ((currentPrice - avgPrice) / avgPrice) * 100;
-            
+
             // Determine if we should apply the red outline
             const applyRedOutline = priceDiffPercentage >= 5;
-            
+
             let outlineInfo = '';
             if (applyRedOutline) {
                 outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% cheaper!</div>`;
@@ -305,26 +310,27 @@ $(document).ready(function() {
     }
 
     function updateLastUpdateTime() {
-    $.get('/last_update_time', function(data) {
-        if (data.last_update) {
-            const lastUpdate = new Date(data.last_update);
-            $('#lastUpdateTime').text(lastUpdate.toLocaleString());
-        } else {
-            $('#lastUpdateTime').text('Not yet updated');
-        }
-    });
-}
+        $.get('/last_update_time', function(data) {
+            if (data.last_update) {
+                const lastUpdate = new Date(data.last_update);
+                $('#lastUpdateTime').text(lastUpdate.toLocaleString());
+            } else {
+                $('#lastUpdateTime').text('Not yet updated');
+            }
+        });
+    }
 
     function updateTimer() {
         $.get('/last_update_time', function(data) {
             if (data.last_update) {
+
                 const lastUpdate = new Date(data.last_update);
                 const nextUpdate = new Date(data.next_update);
                 const now = new Date();
 
                 $('#lastUpdateTime').text(formatDate(lastUpdate));
-                
                 if (nextUpdate > now) {
+                    location.reload();
                     const timeLeft = Math.floor((nextUpdate - now) / 1000);
                     $('#nextUpdateTime').text(formatTimeLeft(timeLeft));
                     setTimeout(updateTimer, 1000);
@@ -339,23 +345,26 @@ $(document).ready(function() {
             }
         });
     }
-    
+
     function formatDate(date) {
-        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
-    
+
     function formatTimeLeft(seconds) {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
-    
+
     // Function to format prices
     function formatPrice(price, isCoinsPerXp = false) {
         if (typeof price === 'string') return price;
 
         if (isCoinsPerXp) {
-            return price.toFixed(1);  // Format to one decimal place for Coins per XP
+            return price.toFixed(1); // Format to one decimal place for Coins per XP
         }
 
         if (price >= 1e6) {
@@ -366,4 +375,5 @@ $(document).ready(function() {
             return price.toFixed(0);
         }
     }
+
 });

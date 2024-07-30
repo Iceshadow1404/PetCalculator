@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,17 +14,18 @@
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
 </head>
+
 <body>
     <div class="container mx-auto px-4 py-8 relative">
-        
+
         <!-- New Compact Mode button div -->
         <div class="absolute top-0 right-0 mt-16 mr-4">
             <button id="compactModeButton" class="bg-blue-600 text-white font-bold py-2 px-4 rounded">
                 Compact Mode
             </button>
         </div>
-        
-        
+
+
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold mb-4">Pet Level Guide</h1>
             <div id="updateTimer" class="text-center mb-4">
@@ -105,4 +107,5 @@
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
+
 </html>
