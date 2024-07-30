@@ -6,7 +6,7 @@ let storedResults = [];
 // Function to copy UUID to clipboard
 function copyTextToClipboard(text, buttonElement, event) {
     event.stopPropagation(); // Prevent the click event from bubbling up
-    
+
     const textarea = document.createElement('textarea');
     textarea.value = text;
     document.body.appendChild(textarea);
@@ -28,6 +28,7 @@ $(document).ready(function() {
     initializeFilters();
     applySettingsFromCookies();
     analyzeAuctions();
+    updateTimer();
 
     // Function to set a cookie
     function setCookie(name, value, days) {
@@ -37,17 +38,17 @@ $(document).ready(function() {
             date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
             expires = "; expires=" + date.toUTCString();
         }
-        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
     }
 
     // Function to get a cookie
     function getCookie(name) {
         var nameEQ = name + "=";
         var ca = document.cookie.split(';');
-        for(var i=0;i < ca.length;i++) {
+        for (var i = 0; i < ca.length; i++) {
             var c = ca[i];
-            while (c.charAt(0)==' ') c = c.substring(1,c.length);
-            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
         }
         return null;
     }
@@ -72,7 +73,7 @@ $(document).ready(function() {
             $('#petSkillFilter').val(petSkillFilter);
         }
 
-         // Apply rarity button filters
+        // Apply rarity button filters
         let activeRarities = getCookie('activeRarities');
         console.log('Loading active rarities from cookie:', activeRarities);
         if (activeRarities) {
@@ -118,6 +119,7 @@ $(document).ready(function() {
 
     // Event listeners for buttons and dropdowns
     $('#analyzeButton').click(analyzeAuctions);
+
     $('#skillSelect').change(function() {
         setCookie('selectedSkill', $(this).val(), 30);
         analyzeAuctions();
@@ -198,7 +200,6 @@ $(document).ready(function() {
     // Function to sort results based on selected criteria
     function sortResults(data) {
         let sortBy = $('#sortToggle').val();
-        
         return data.sort((a, b) => {
             // Sort directly by the selected criteria
             return b[sortBy] - a[sortBy];
@@ -238,8 +239,8 @@ $(document).ready(function() {
         console.log('Displaying results:', data);
         var resultsHtml = '';
         data.forEach(function(item, index) {
-            console.log(`Item ${index}: name=${item.name}, rarity=${item.rarity}`);    
-    
+            console.log(`Item ${index}: name=${item.name}, rarity=${item.rarity}`);
+            
             // Calculate the price difference percentage
             const currentPrice = item.high_price;
             const avgPrice = item.high_day_avg;
@@ -250,9 +251,9 @@ $(document).ready(function() {
             
             let outlineInfo = '';
             if (applyRedOutline) {
-                outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% higher!</div>`;
+                outlineInfo = `<div class="text-red-500 text-xl font-bold text-center my-4">Average price is ${priceDiffPercentage.toFixed(2)}% cheaper!</div>`;
             }
-    
+
             resultsHtml += `
             <div class="bg-gray-800 rounded-lg shadow-lg p-6 pet-item ${applyRedOutline ? 'red-outline' : ''}" data-item='${JSON.stringify(item)}'>
                 <div class="flex items-center">
@@ -262,47 +263,93 @@ $(document).ready(function() {
                     <div class="flex-grow flex items-center justify-center mb-4">
                         <img src="/images/pets/${item.name.toLowerCase().replace(/\s+/g, '_')}.png" alt="${item.name}" class="w-12 h-12 mr-4">
                         <h3 class="text-2xl font-bold text-${item.rarity.toLowerCase()}">${item.name} (${item.rarity})</h3>
-                        </div>
                     </div>
-                    ${outlineInfo}
-                    <div class="pet-details">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="text-center">
-                                <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
-                                <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
-                                <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
+                </div>
+                ${outlineInfo}
+                <div class="pet-details">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <p class="text-lg">Profit: ${formatPrice(item.profit)}</p>
+                            <p class="text-lg">Profit without tax: ${formatPrice(item.profit_without_tax)}</p>
+                            <p class="text-lg">Coins per XP: ${formatPrice(item.coins_per_xp, true)} ${item.coins_per_xp_note ? `(${item.coins_per_xp_note})` : ''}</p>
+                        </div>
+                        <div class="text-center button-container">
+                            <div class="price-container">
+                                <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
+                                <span class="price-value">${formatPrice(item.low_price)}</span>
+                                <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
                             </div>
-                            <div class="text-center button-container">
-                                <div class="price-container">
-                                    <span class="price-label">${item.name === 'Golden Dragon' ? 'LVL 102' : 'LVL 1'} Price:</span>
-                                    <span class="price-value">${formatPrice(item.low_price)}</span>
-                                    <span class="price-avg">(24h: ${formatPrice(item.low_day_avg)}, 7d: ${formatPrice(item.low_week_avg)})</span>
-                                </div>
-                                <div class="copy-button-container">
-                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this, event)">
-                                        Copy UUID
-                                    </button>
-                                </div>
-                                <div class="price-container mt-4">
-                                    <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
-                                    <span class="price-value">${formatPrice(item.high_price)}</span>
-                                    <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
-                                </div>
-                                <div class="copy-button-container">
-                                    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this, event)">
-                                        Copy UUID
-                                    </button>
-                                </div>
+                            <div class="copy-button-container">
+                                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.low_uuid}', this, event)">
+                                    Copy UUID
+                                </button>
+                            </div>
+                            <div class="price-container mt-4">
+                                <span class="price-label">LVL ${item.name === 'Golden Dragon' ? '200' : '100'} Price:</span>
+                                <span class="price-value">${formatPrice(item.high_price)}</span>
+                                <span class="price-avg">(24h: ${formatPrice(item.high_day_avg)}, 7d: ${formatPrice(item.high_week_avg)})</span>
+                            </div>
+                            <div class="copy-button-container">
+                                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded mt-1 copy-button" onclick="copyTextToClipboard('/viewauction ${item.high_uuid}', this, event)">
+                                    Copy UUID
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
             `;
         });
         $('#results').html(resultsHtml);
         console.log('Results HTML updated');
     }
 
+    function updateLastUpdateTime() {
+    $.get('/last_update_time', function(data) {
+        if (data.last_update) {
+            const lastUpdate = new Date(data.last_update);
+            $('#lastUpdateTime').text(lastUpdate.toLocaleString());
+        } else {
+            $('#lastUpdateTime').text('Not yet updated');
+        }
+    });
+}
+
+    function updateTimer() {
+        $.get('/last_update_time', function(data) {
+            if (data.last_update) {
+                const lastUpdate = new Date(data.last_update);
+                const nextUpdate = new Date(data.next_update);
+                const now = new Date();
+
+                $('#lastUpdateTime').text(formatDate(lastUpdate));
+                
+                if (nextUpdate > now) {
+                    const timeLeft = Math.floor((nextUpdate - now) / 1000);
+                    $('#nextUpdateTime').text(formatTimeLeft(timeLeft));
+                    setTimeout(updateTimer, 1000);
+                } else {
+                    $('#nextUpdateTime').text('Updating soon...');
+                    setTimeout(updateTimer, 5000);
+                }
+            } else {
+                $('#lastUpdateTime').text('Not yet updated');
+                $('#nextUpdateTime').text('Updating soon...');
+                setTimeout(updateTimer, 5000);
+            }
+        });
+    }
+    
+    function formatDate(date) {
+        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    function formatTimeLeft(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    
     // Function to format prices
     function formatPrice(price, isCoinsPerXp = false) {
         if (typeof price === 'string') return price;

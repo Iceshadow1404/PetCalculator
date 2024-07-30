@@ -16,6 +16,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 from flask import send_from_directory
 
+last_update_time = None
+
 # Initialize the database
 def init_db():
     conn = sqlite3.connect('pet_prices.db')
@@ -258,9 +260,12 @@ async def fetch_and_analyze_auctions(selected_skill):
     return output_list
 
 
-def calculate_profit_from_db(pet_list, pet_data, selected_skill):
+def calculate_profit_from_db(pet_list, pet_data, selected_skill, max_age_hours=0.0833):  # 5 minutes
     logging.debug(f"Pet data structure: {json.dumps(pet_data, indent=2)}")
     new_pet_list = []
+    current_time = datetime.now()
+    max_age = timedelta(hours=max_age_hours)
+
     for category in pet_list:
         for key, pets in category.items():
             for pet in pets:
@@ -270,6 +275,24 @@ def calculate_profit_from_db(pet_list, pet_data, selected_skill):
 
                 for rarity, pet_info in pet_data[pet].items():
                     logging.debug(f"Processing {pet} with rarity {rarity}")
+
+                    def parse_timestamp(timestamp_str):
+                        if not timestamp_str:
+                            return None
+                        try:
+                            return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+                        except ValueError:
+                            logging.warning(f"Invalid timestamp format for {pet} {rarity}: {timestamp_str}")
+                            return None
+
+                    low_timestamp = parse_timestamp(pet_info.get("low_timestamp"))
+                    high_timestamp = parse_timestamp(pet_info.get("high_timestamp"))
+
+                    # Skip this entry if either timestamp is missing or older than 5 minutes
+                    if not low_timestamp or not high_timestamp or \
+                            current_time - low_timestamp > max_age or \
+                            current_time - high_timestamp > max_age:
+                        continue
 
                     if pet == "Golden Dragon":
                         xp_required = get_golden_dragon_xp()
@@ -474,20 +497,25 @@ def get_average_prices_batch(pet_data):
 
 
 def fetch_pet_data_from_db():
-    logging.debug("Starting fetch_pet_data_from_db")
     conn = sqlite3.connect('pet_prices.db')
     c = conn.cursor()
 
     c.execute("""
-    SELECT pet_name, rarity, level, price, uuid,
-           AVG(CASE WHEN timestamp > datetime('now', '-1 day') THEN price ELSE NULL END) OVER (PARTITION BY pet_name, rarity, level) as day_avg,
-           AVG(CASE WHEN timestamp > datetime('now', '-7 day') THEN price ELSE NULL END) OVER (PARTITION BY pet_name, rarity, level) as week_avg
-    FROM pet_prices
-    WHERE (pet_name, rarity, level, timestamp) IN (
-        SELECT pet_name, rarity, level, MAX(timestamp)
+    WITH latest_prices AS (
+        SELECT pet_name, rarity, level, price, uuid, timestamp,
+               ROW_NUMBER() OVER (PARTITION BY pet_name, rarity, level ORDER BY timestamp DESC) as rn
         FROM pet_prices
-        GROUP BY pet_name, rarity, level
     )
+    SELECT lp.pet_name, lp.rarity, lp.level, 
+           lp.price as current_price, 
+           lp.uuid,
+           lp.timestamp,
+           AVG(CASE WHEN pp.timestamp > datetime('now', '-1 day') THEN pp.price END) as day_avg,
+           AVG(CASE WHEN pp.timestamp > datetime('now', '-7 day') THEN pp.price END) as week_avg
+    FROM latest_prices lp
+    JOIN pet_prices pp ON lp.pet_name = pp.pet_name AND lp.rarity = pp.rarity AND lp.level = pp.level
+    WHERE lp.rn = 1
+    GROUP BY lp.pet_name, lp.rarity, lp.level
     """)
 
     results = c.fetchall()
@@ -495,23 +523,28 @@ def fetch_pet_data_from_db():
 
     pet_data = {}
     for row in results:
-        pet_name, rarity, level, price, uuid, day_avg, week_avg = row
+        pet_name, rarity, level, current_price, uuid, timestamp, day_avg, week_avg = row
         if pet_name not in pet_data:
             pet_data[pet_name] = {}
         if rarity not in pet_data[pet_name]:
             pet_data[pet_name][rarity] = {}
-        pet_data[pet_name][rarity][f"{level}_price"] = price
+        pet_data[pet_name][rarity][f"{level}_price"] = current_price
         pet_data[pet_name][rarity][f"{level}_uuid"] = uuid
+        pet_data[pet_name][rarity][f"{level}_timestamp"] = timestamp
         pet_data[pet_name][rarity][f"{level}_day_avg"] = day_avg
         pet_data[pet_name][rarity][f"{level}_week_avg"] = week_avg
 
-    logging.debug(f"Fetched data for {len(pet_data)} pets")
-    for pet, rarities in pet_data.items():
-        logging.debug(f"Pet: {pet}, Rarities: {list(rarities.keys())}")
-
     return pet_data
 
+@app.route('/last_update_time')
+def get_last_update_time():
+    global last_update_time
+    if last_update_time is None:
+        return jsonify({"last_update": None})
+    return jsonify({"last_update": last_update_time.isoformat()})
+
 def update_pet_prices():
+    global last_update_time
     print("Starting update_pet_prices")
     pet_list = load_pet_list("petlist.json")
     print("Pet list loaded")
@@ -554,6 +587,7 @@ def update_pet_prices():
 
     conn.commit()
     conn.close()
+    last_update_time = datetime.now()
     print("Pet prices updated successfully")
 
 
@@ -561,19 +595,15 @@ def find_min_auction(auctions):
     return min((a for a in auctions if "Tier Boost" not in a.get("item_lore", "")),
                key=lambda x: x["starting_bid"], default=None)
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_pet_prices, trigger="interval", minutes=5)
-scheduler.start()
-
-atexit.register(lambda: scheduler.shutdown())
+if not hasattr(app, 'scheduler'):
+    app.scheduler = BackgroundScheduler()
+    app.scheduler.add_job(func=update_pet_prices, trigger="interval", minutes=5)
+    app.scheduler.start()
+    atexit.register(lambda: app.scheduler.shutdown())
 
 if __name__ == '__main__':
-    pet_data = fetch_pet_data_from_db()
-    logging.debug("Pet data structure:")
-    logging.debug(json.dumps(pet_data, indent=2))
-
     init_db()
-    app.run(host="0.0.0.0", port=8000, debug=True)
     #update_pet_prices()
+    app.run(host="0.0.0.0", port=8000, debug=True)
     if not os.path.exists('images/pets'):
         os.makedirs('images/pets')
