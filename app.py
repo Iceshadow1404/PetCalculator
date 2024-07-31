@@ -23,8 +23,10 @@ import sqlite3
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
+import threading
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
-last_update_time = None
+init_event = threading.Event()
 
 # Initialize the database
 def init_db():
@@ -50,12 +52,25 @@ def reset_db():
     conn.close()
     init_db()
 
+def initialize_app():
+    global last_update_time
+    init_db()
+    last_update_time = None
+    init_event.set()
+
+def update_pet_prices_wrapper():
+    init_event.wait()
+    update_pet_prices()
+
+def job_listener(event):
+    if event.exception:
+        print(f'The job failed with {event.exception}')
+    else:
+        print('The job completed successfully')
+
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
-
-app.config["SECRET_KEY"] = "ihr_geheimer_schlüssel"
-PASSWORD = "1404"
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -720,8 +735,14 @@ if not hasattr(app, "scheduler"):
     atexit.register(lambda: app.scheduler.shutdown())
 
 if __name__ == "__main__":
-    init_db()
-    update_pet_prices()
+    initialize_app()
+
+    if not hasattr(app, "scheduler"):
+        app.scheduler = BackgroundScheduler()
+        app.scheduler.add_job(func=update_pet_prices_wrapper, trigger="interval", minutes=5,
+                              next_run_time=datetime.now())
+        app.scheduler.add_listener(job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+        app.scheduler.start()
+        atexit.register(lambda: app.scheduler.shutdown())
+
     app.run(host="0.0.0.0", port=8000, debug=True)
-    if not os.path.exists("images/pets"):
-        os.makedirs("images/pets")
